@@ -5,13 +5,13 @@ import { RULES, resolveRuleName, rulesInCategory, suggestRuleName } from "#src/r
 
 import { toPosix } from "./gitignore.ts";
 import { validate } from "./schema.ts";
-import { type AnyRule, CATEGORIES, type Category, type Severity } from "./types.ts";
+import { type AnyRule, CATEGORIES, type Category, DEFAULT_FILE_PATTERNS, type Severity } from "./types.ts";
 import { isRecord } from "./util.ts";
 
 export const CONFIG_FILE_NAMES = [".contextlintrc.json", ".contextlintrc.jsonc"];
 
 /** Context files linted when the config doesn't specify `files`. */
-export const DEFAULT_FILE_PATTERNS = ["AGENTS.md", "AGENT.md", "CLAUDE.md", "CLAUDE.local.md", "GEMINI.md"];
+export { DEFAULT_FILE_PATTERNS };
 
 const TOP_LEVEL_KEYS = new Set(["$schema", "files", "categories", "rules", "overrides", "ignorePatterns"]);
 

@@ -65,6 +65,9 @@ directories (`.claude/skills/`, `.agents/skills/`, …) below the linted directo
 ignore rules. You can also name a skill directory or its `SKILL.md` directly. A named `SKILL.md`
 is checked only by `context/no-invalid-skill`; where that rule is off, the file is skipped with a
 warning. Checked skill files count toward the lint totals.
+[`context/no-misnamed-agent-file`](#contextno-misnamed-agent-file) also looks at the names of the
+other files in the linted directories, to find agent files that discovery misses because of their
+case (`agents.md`).
 
 ### Options
 
@@ -116,7 +119,7 @@ or without its `context/` prefix.
 Settings are applied in this order: built-in defaults (`recommended` rules as errors), then
 `categories`, then `rules`, then matching `overrides`, then CLI flags. Each layer only changes
 what it mentions, including individual keys in a rule's options object. The example above keeps
-`no-broken-reference`, `no-agent-files-drift` and `no-invalid-skill` enabled. To opt out entirely, use
+`no-broken-reference`, `no-agent-files-drift`, `no-invalid-skill` and `no-misnamed-agent-file` enabled. To opt out entirely, use
 `"categories": { "recommended": "off" }` or `-A all`.
 
 Glob patterns (`files`, `overrides[].files`, `ignorePatterns`) are resolved relative to the
@@ -164,6 +167,7 @@ errors, so they don't change the exit code, and `--quiet` hides them.
 | [`context/no-broken-reference`](#contextno-broken-reference)                 | recommended | Relative links, images and `#anchors` resolve                             |
 | [`context/no-agent-files-drift`](#contextno-agent-files-drift)               | recommended | Agent files in one directory are identical or symlinked                   |
 | [`context/no-invalid-skill`](#contextno-invalid-skill)                       | recommended | Skill directories have a valid layout and valid `SKILL.md` frontmatter    |
+| [`context/no-misnamed-agent-file`](#contextno-misnamed-agent-file)           | recommended | Agent files are spelled in the exact case agents look for                 |
 | [`context/no-unnecessary-agent-files`](#contextno-unnecessary-agent-files)   | –           | No `CLAUDE.md` that only mirrors `AGENTS.md`                              |
 | [`context/keep-agents-file-up-to-date`](#contextkeep-agents-file-up-to-date) | –           | Context files were changed recently                                       |
 
@@ -324,8 +328,8 @@ linted directory outside Git), never by directories above it. In a repository wh
   (such as `.claude -> ../shared/.claude`).
 
 Grouping folders (`skills/review/security/SKILL.md`, supported by Codex, Cursor and OpenCode) are
-accepted, and the skills inside them are checked. Folders without Markdown files, such as shared
-scripts, are left alone.
+accepted, and the skills inside them are checked, also below a misnamed `skill.md`. Folders
+without Markdown files, such as shared scripts, are left alone.
 
 **Frontmatter.** Always checked:
 
@@ -356,6 +360,29 @@ all fields as optional, but Codex, GitHub Copilot, Cursor and Gemini CLI need th
 `overrides` apply per skill. For example, `"files": [".claude/skills/legacy/**"]` changes the
 rule for one skill. An override can match the skill file or the skills root; one that matches the
 skills root (`"files": ["custom"]`) applies its severity and all options to every skill in it.
+
+### `context/no-misnamed-agent-file`
+
+Agents look for `AGENTS.md`, `AGENT.md`, `CLAUDE.md`, `CLAUDE.local.md` and `GEMINI.md` by their
+exact name. On case-insensitive file systems (the macOS and Windows default), `agents.md` or
+`CLAUDE.MD` is found anyway, so the mistake goes unnoticed until a teammate or CI runs on Linux,
+where the file is silently ignored. This rule reports such files:
+
+- A name that only differs in the case of its extension (`AGENTS.MD`, `CLAUDE.Md`) is reported
+  anywhere.
+- A name like `agents.md` or `Claude.md` is also common for documentation pages and prompts, so it
+  is only reported where context files are expected: in the project root, next to a correctly named
+  context file, in a package directory (one with `package.json`, `Cargo.toml`, `pyproject.toml`,
+  `go.mod`, …) and, for `claude.md`, in `.claude/`. It is not reported when other Markdown pages
+  with lowercase names (`index.md`, `guide.md`) sit next to it, as in a documentation folder.
+  `README.md` and other uppercase names don't count as pages.
+
+A file is never reported when the correctly named file exists next to it (possible on
+case-sensitive file systems) or when it matches the [`files`](#options) patterns, and git-ignored
+files are skipped unless named on the command line. A `SKILL.md` in the wrong case is reported by
+[`context/no-invalid-skill`](#contextno-invalid-skill). Rename tracked files with
+`git mv`: on case-insensitive file systems, Git doesn't notice a plain rename that only changes
+case.
 
 ### `context/no-unnecessary-agent-files`
 

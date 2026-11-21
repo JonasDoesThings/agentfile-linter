@@ -82,6 +82,18 @@ describe("context/no-invalid-skill: layout", () => {
     ]);
   });
 
+  test("skills nested below a misnamed SKILL.md are validated", async () => {
+    const root = makeProject({
+      ".claude/skills/group/skill.md": "# Group notes\n",
+      ".claude/skills/group/deploy/SKILL.md": skill("name: wrong-name"),
+    });
+    expect(await summary(root)).toEqual([
+      ".claude/skills/group/deploy/SKILL.md:1 Frontmatter is missing `description`",
+      ".claude/skills/group/deploy/SKILL.md:2 Skill name `wrong-name` does not match its directory `deploy`",
+      ".claude/skills/group/skill.md:1 `skill.md` must be named exactly `SKILL.md`",
+    ]);
+  });
+
   test("symlinked skill directories are followed, broken links reported", async () => {
     const root = makeProject({
       "shared/skills/linked/SKILL.md": skill("name: linked"),

@@ -29,7 +29,7 @@ describe("cli", () => {
     expect(stdout).toContain("× context(no-missing-path): Path `src/missing.ts` does not exist");
     expect(stdout).toContain("╭─[AGENTS.md:3:6]");
     expect(stdout).toContain("Found 0 warnings and 1 error.");
-    expect(stdout).toContain("on 1 file with 4 rules");
+    expect(stdout).toContain("on 1 file with 5 rules");
   });
 
   test("exits 0 when clean, and with warnings unless --deny-warnings / --max-warnings", async () => {

@@ -303,7 +303,7 @@ const isEnabledAt = (resolver: RuleResolver, rule: AnyRule, { path, root }: Tree
 
 type DiscoveryInputs = Pick<
   TreeDiscoveryContext<unknown>,
-  "directories" | "directoryInputs" | "explicitFiles" | "isIgnored"
+  "directories" | "directoryInputs" | "explicitFiles" | "isIgnored" | "isContextFile"
 >;
 
 function collectInputs(options: LintOptions, prepared: LintSetup, registry: ProjectRegistry) {
@@ -345,13 +345,14 @@ function collectInputs(options: LintOptions, prepared: LintSetup, registry: Proj
 
   // A file named on the command line is checked as it would be when found by scanning: a SKILL.md
   // gets only the tree rules that check skills, unless it also matches the context file patterns.
+  const isContextFile = (path: string) => config.files.some((pattern) => matchesFilePattern(pattern, config.dir, path));
   const discoveryInputs: DiscoveryInputs = {
     directories: discovery.directories,
     directoryInputs: discovery.directoryInputs,
     explicitFiles: discovery.explicitFiles,
     isIgnored,
+    isContextFile,
   };
-  const isContextFile = (path: string) => config.files.some((pattern) => matchesFilePattern(pattern, config.dir, path));
   const hasOtherExplicitFiles = discovery.explicitFiles.some((path) => !isContextFile(path));
   const found = collectTreeInputs(discoveryInputs, registry, prepared.resolver, hasOtherExplicitFiles);
   const treeInputs = new Map<AnyRule, TreeInput[]>();
@@ -405,6 +406,7 @@ function treeDiscoveryContext(
     directoryInputs: inputs.directoryInputs,
     explicitFiles: inputs.explicitFiles,
     isIgnored: inputs.isIgnored,
+    isContextFile: inputs.isContextFile,
     projectFor: (dir) => registry.forDirectory(dir),
     optionsFor: (path, root) => resolver.optionsFor(rule, path, root),
     discoveryOptions: resolver.discoveryOptions(rule),

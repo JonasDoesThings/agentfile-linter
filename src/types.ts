@@ -19,6 +19,9 @@ export type SeverityInput = Severity | "allow" | "deny" | 0 | 1 | 2;
 export const CATEGORIES = ["recommended"] as const;
 export type Category = (typeof CATEGORIES)[number];
 
+/** Context file names, spelled exactly as agents look for them. These are the default `files` patterns. */
+export const DEFAULT_FILE_PATTERNS = ["AGENTS.md", "AGENT.md", "CLAUDE.md", "CLAUDE.local.md", "GEMINI.md"];
+
 export interface RuleMeta {
   /** Fully qualified rule name, e.g. `context/no-missing-path`. */
   name: string;
@@ -117,6 +120,8 @@ export interface TreeDiscoveryContext<Options> {
   projectFor(dir: string): Project;
   /** Whether a path is excluded from linting (.gitignore, ignore patterns), as during discovery. */
   isIgnored(path: string, isDir: boolean): boolean;
+  /** Whether a path matches the configured context file patterns (`files`). */
+  isContextFile(path: string): boolean;
   /**
    * The rule's options for `path`: config plus the overrides matching `path` or, when given, `root`.
    * Options never depend on the rule's severity; see `TreeContext.isEnabled`.

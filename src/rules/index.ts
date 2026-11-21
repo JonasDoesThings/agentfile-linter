@@ -5,6 +5,7 @@ import { keepAgentsFileUpToDate } from "./keep-agents-file-up-to-date.ts";
 import { noAgentFilesDrift } from "./no-agent-files-drift.ts";
 import { noBrokenReference } from "./no-broken-reference.ts";
 import { noInvalidSkill } from "./no-invalid-skill.ts";
+import { noMisnamedAgentFile } from "./no-misnamed-agent-file.ts";
 import { noMissingPath } from "./no-missing-path.ts";
 import { noMissingScript } from "./no-missing-script.ts";
 import { noUnnecessaryAgentFiles } from "./no-unnecessary-agent-files.ts";
@@ -17,6 +18,7 @@ export const RULES: ReadonlyMap<string, AnyRule> = new Map(
     noBrokenReference,
     noAgentFilesDrift,
     noInvalidSkill,
+    noMisnamedAgentFile,
     noUnnecessaryAgentFiles,
     keepAgentsFileUpToDate,
   ].map((rule) => [rule.meta.name, rule]),

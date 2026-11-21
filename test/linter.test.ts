@@ -274,6 +274,6 @@ describe("results", () => {
       config: false,
       ruleFlags: [{ severity: "warn", target: "no-missing-script" }],
     });
-    expect(result).toMatchObject({ fileCount: 1, ruleCount: 4, errorCount: 1, warningCount: 1 });
+    expect(result).toMatchObject({ fileCount: 1, ruleCount: 5, errorCount: 1, warningCount: 1 });
   });
 });

@@ -837,6 +837,118 @@
             }
           ]
         },
+        "context/no-misnamed-agent-file": {
+          "description": "AGENTS.md, CLAUDE.md, ... must be named in the exact case agents look for",
+          "oneOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "warn",
+                    "error",
+                    "allow",
+                    "deny"
+                  ]
+                },
+                {
+                  "type": "integer",
+                  "enum": [
+                    0,
+                    1,
+                    2
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "warn",
+                        "error",
+                        "allow",
+                        "deny"
+                      ]
+                    },
+                    {
+                      "type": "integer",
+                      "enum": [
+                        0,
+                        1,
+                        2
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "minItems": 1,
+              "maxItems": 1
+            }
+          ]
+        },
+        "no-misnamed-agent-file": {
+          "description": "AGENTS.md, CLAUDE.md, ... must be named in the exact case agents look for",
+          "oneOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "warn",
+                    "error",
+                    "allow",
+                    "deny"
+                  ]
+                },
+                {
+                  "type": "integer",
+                  "enum": [
+                    0,
+                    1,
+                    2
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "warn",
+                        "error",
+                        "allow",
+                        "deny"
+                      ]
+                    },
+                    {
+                      "type": "integer",
+                      "enum": [
+                        0,
+                        1,
+                        2
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "minItems": 1,
+              "maxItems": 1
+            }
+          ]
+        },
         "context/no-unnecessary-agent-files": {
           "description": "CLAUDE.md must not merely mirror AGENTS.md, which Claude Code reads itself",
           "oneOf": [
@@ -1934,6 +2046,118 @@
                     ],
                     "minItems": 1,
                     "maxItems": 2
+                  }
+                ]
+              },
+              "context/no-misnamed-agent-file": {
+                "description": "AGENTS.md, CLAUDE.md, ... must be named in the exact case agents look for",
+                "oneOf": [
+                  {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "warn",
+                          "error",
+                          "allow",
+                          "deny"
+                        ]
+                      },
+                      {
+                        "type": "integer",
+                        "enum": [
+                          0,
+                          1,
+                          2
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "prefixItems": [
+                      {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "off",
+                              "warn",
+                              "error",
+                              "allow",
+                              "deny"
+                            ]
+                          },
+                          {
+                            "type": "integer",
+                            "enum": [
+                              0,
+                              1,
+                              2
+                            ]
+                          }
+                        ]
+                      }
+                    ],
+                    "minItems": 1,
+                    "maxItems": 1
+                  }
+                ]
+              },
+              "no-misnamed-agent-file": {
+                "description": "AGENTS.md, CLAUDE.md, ... must be named in the exact case agents look for",
+                "oneOf": [
+                  {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "warn",
+                          "error",
+                          "allow",
+                          "deny"
+                        ]
+                      },
+                      {
+                        "type": "integer",
+                        "enum": [
+                          0,
+                          1,
+                          2
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "prefixItems": [
+                      {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "off",
+                              "warn",
+                              "error",
+                              "allow",
+                              "deny"
+                            ]
+                          },
+                          {
+                            "type": "integer",
+                            "enum": [
+                              0,
+                              1,
+                              2
+                            ]
+                          }
+                        ]
+                      }
+                    ],
+                    "minItems": 1,
+                    "maxItems": 1
                   }
                 ]
               },

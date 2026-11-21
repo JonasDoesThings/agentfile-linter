@@ -365,8 +365,9 @@ class SkillDiscovery {
         message: `\`${misnamed.name}\` must be named exactly \`${SKILL_FILE}\``,
         help: `Agents look for \`${SKILL_FILE}\`; other spellings are not found on case-sensitive file systems.`,
       });
-      return true;
     }
+    // Skills nested below a misnamed SKILL.md are still checked: agents on case-sensitive file
+    // systems don't see the misnamed file, so they look for skills in the subdirectories.
     let nested = false;
     if (ancestors.length < MAX_DEPTH) {
       const parents = [...ancestors, real];
@@ -374,6 +375,7 @@ class SkillDiscovery {
         if (sub.isDir && this.canVisit(sub.path) && this.findInDirectory(root, sub.path, parents)) nested = true;
       }
     }
+    if (misnamed) return true;
     if (!nested && ancestors.length === 1) {
       // A Markdown file with frontmatter is most likely a misnamed SKILL.md.
       const candidate = selectedFiles.find(

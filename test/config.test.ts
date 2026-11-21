@@ -17,6 +17,7 @@ const ALL_ERROR: Record<string, string> = {
   "context/no-broken-reference": "error",
   "context/no-agent-files-drift": "error",
   "context/no-invalid-skill": "error",
+  "context/no-misnamed-agent-file": "error",
 };
 
 describe("rule resolution", () => {
@@ -44,6 +45,7 @@ describe("rule resolution", () => {
       "context/no-missing-script": "warn",
       "context/no-agent-files-drift": "error",
       "context/no-invalid-skill": "warn",
+      "context/no-misnamed-agent-file": "warn",
     });
   });
 
@@ -56,7 +58,7 @@ describe("rule resolution", () => {
     ]);
     expect(enabled(resolver)).toEqual({ "context/no-missing-path": "error", "context/no-missing-script": "warn" });
     const categories = new RuleResolver(config, [{ severity: "warn", target: "recommended" }]);
-    expect(Object.values(enabled(categories))).toEqual(["warn", "warn", "warn", "warn", "warn"]);
+    expect(Object.values(enabled(categories))).toEqual(["warn", "warn", "warn", "warn", "warn", "warn"]);
   });
 
   test("overrides apply to matching files", () => {
