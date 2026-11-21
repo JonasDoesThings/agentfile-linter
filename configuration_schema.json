@@ -690,6 +690,440 @@
               "maxItems": 2
             }
           ]
+        },
+        "context/no-invalid-skill": {
+          "description": "Skill directories must have a valid layout and SKILL.md files valid frontmatter",
+          "oneOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "warn",
+                    "error",
+                    "allow",
+                    "deny"
+                  ]
+                },
+                {
+                  "type": "integer",
+                  "enum": [
+                    0,
+                    1,
+                    2
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "warn",
+                        "error",
+                        "allow",
+                        "deny"
+                      ]
+                    },
+                    {
+                      "type": "integer",
+                      "enum": [
+                        0,
+                        1,
+                        2
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "directories": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Glob patterns of skills directories, relative to the project root. `skills/` directories of Claude Code plugins are always checked."
+                    },
+                    "spec": {
+                      "type": "boolean",
+                      "description": "Enforce the Agent Skills specification: required `name` and `description`, name format and length, name matching the directory."
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ],
+              "minItems": 1,
+              "maxItems": 2
+            }
+          ]
+        },
+        "no-invalid-skill": {
+          "description": "Skill directories must have a valid layout and SKILL.md files valid frontmatter",
+          "oneOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "warn",
+                    "error",
+                    "allow",
+                    "deny"
+                  ]
+                },
+                {
+                  "type": "integer",
+                  "enum": [
+                    0,
+                    1,
+                    2
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "warn",
+                        "error",
+                        "allow",
+                        "deny"
+                      ]
+                    },
+                    {
+                      "type": "integer",
+                      "enum": [
+                        0,
+                        1,
+                        2
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "directories": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Glob patterns of skills directories, relative to the project root. `skills/` directories of Claude Code plugins are always checked."
+                    },
+                    "spec": {
+                      "type": "boolean",
+                      "description": "Enforce the Agent Skills specification: required `name` and `description`, name format and length, name matching the directory."
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ],
+              "minItems": 1,
+              "maxItems": 2
+            }
+          ]
+        },
+        "context/no-unnecessary-agent-files": {
+          "description": "CLAUDE.md must not merely mirror AGENTS.md, which Claude Code reads itself",
+          "oneOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "warn",
+                    "error",
+                    "allow",
+                    "deny"
+                  ]
+                },
+                {
+                  "type": "integer",
+                  "enum": [
+                    0,
+                    1,
+                    2
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "warn",
+                        "error",
+                        "allow",
+                        "deny"
+                      ]
+                    },
+                    {
+                      "type": "integer",
+                      "enum": [
+                        0,
+                        1,
+                        2
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "minItems": 1,
+              "maxItems": 1
+            }
+          ]
+        },
+        "no-unnecessary-agent-files": {
+          "description": "CLAUDE.md must not merely mirror AGENTS.md, which Claude Code reads itself",
+          "oneOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "warn",
+                    "error",
+                    "allow",
+                    "deny"
+                  ]
+                },
+                {
+                  "type": "integer",
+                  "enum": [
+                    0,
+                    1,
+                    2
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "warn",
+                        "error",
+                        "allow",
+                        "deny"
+                      ]
+                    },
+                    {
+                      "type": "integer",
+                      "enum": [
+                        0,
+                        1,
+                        2
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "minItems": 1,
+              "maxItems": 1
+            }
+          ]
+        },
+        "context/keep-agents-file-up-to-date": {
+          "description": "Context files must be revisited regularly (judged by their last Git commit or modification time)",
+          "oneOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "warn",
+                    "error",
+                    "allow",
+                    "deny"
+                  ]
+                },
+                {
+                  "type": "integer",
+                  "enum": [
+                    0,
+                    1,
+                    2
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "warn",
+                        "error",
+                        "allow",
+                        "deny"
+                      ]
+                    },
+                    {
+                      "type": "integer",
+                      "enum": [
+                        0,
+                        1,
+                        2
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "warnIfNotUpdatedForDays": {
+                      "description": "Report files not changed for more than this many days (by last commit, or by modification time for files without Git history).",
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        {
+                          "type": "string",
+                          "pattern": "^[0-9]+$"
+                        }
+                      ]
+                    },
+                    "warnOnlyForFilesLongerThanChars": {
+                      "description": "Skip files with at most this many characters (ignoring surrounding whitespace), e.g. `@AGENTS.md` pointers.",
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        {
+                          "type": "string",
+                          "pattern": "^[0-9]+$"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ],
+              "minItems": 1,
+              "maxItems": 2
+            }
+          ]
+        },
+        "keep-agents-file-up-to-date": {
+          "description": "Context files must be revisited regularly (judged by their last Git commit or modification time)",
+          "oneOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "warn",
+                    "error",
+                    "allow",
+                    "deny"
+                  ]
+                },
+                {
+                  "type": "integer",
+                  "enum": [
+                    0,
+                    1,
+                    2
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "warn",
+                        "error",
+                        "allow",
+                        "deny"
+                      ]
+                    },
+                    {
+                      "type": "integer",
+                      "enum": [
+                        0,
+                        1,
+                        2
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "warnIfNotUpdatedForDays": {
+                      "description": "Report files not changed for more than this many days (by last commit, or by modification time for files without Git history).",
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        {
+                          "type": "string",
+                          "pattern": "^[0-9]+$"
+                        }
+                      ]
+                    },
+                    "warnOnlyForFilesLongerThanChars": {
+                      "description": "Skip files with at most this many characters (ignoring surrounding whitespace), e.g. `@AGENTS.md` pointers.",
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        {
+                          "type": "string",
+                          "pattern": "^[0-9]+$"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ],
+              "minItems": 1,
+              "maxItems": 2
+            }
+          ]
         }
       },
       "additionalProperties": false
@@ -1347,6 +1781,440 @@
                           "allowImports": {
                             "type": "boolean",
                             "description": "Treat a file that only contains `@AGENTS.md`-style imports of a sibling as in sync."
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    ],
+                    "minItems": 1,
+                    "maxItems": 2
+                  }
+                ]
+              },
+              "context/no-invalid-skill": {
+                "description": "Skill directories must have a valid layout and SKILL.md files valid frontmatter",
+                "oneOf": [
+                  {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "warn",
+                          "error",
+                          "allow",
+                          "deny"
+                        ]
+                      },
+                      {
+                        "type": "integer",
+                        "enum": [
+                          0,
+                          1,
+                          2
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "prefixItems": [
+                      {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "off",
+                              "warn",
+                              "error",
+                              "allow",
+                              "deny"
+                            ]
+                          },
+                          {
+                            "type": "integer",
+                            "enum": [
+                              0,
+                              1,
+                              2
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "directories": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Glob patterns of skills directories, relative to the project root. `skills/` directories of Claude Code plugins are always checked."
+                          },
+                          "spec": {
+                            "type": "boolean",
+                            "description": "Enforce the Agent Skills specification: required `name` and `description`, name format and length, name matching the directory."
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    ],
+                    "minItems": 1,
+                    "maxItems": 2
+                  }
+                ]
+              },
+              "no-invalid-skill": {
+                "description": "Skill directories must have a valid layout and SKILL.md files valid frontmatter",
+                "oneOf": [
+                  {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "warn",
+                          "error",
+                          "allow",
+                          "deny"
+                        ]
+                      },
+                      {
+                        "type": "integer",
+                        "enum": [
+                          0,
+                          1,
+                          2
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "prefixItems": [
+                      {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "off",
+                              "warn",
+                              "error",
+                              "allow",
+                              "deny"
+                            ]
+                          },
+                          {
+                            "type": "integer",
+                            "enum": [
+                              0,
+                              1,
+                              2
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "directories": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Glob patterns of skills directories, relative to the project root. `skills/` directories of Claude Code plugins are always checked."
+                          },
+                          "spec": {
+                            "type": "boolean",
+                            "description": "Enforce the Agent Skills specification: required `name` and `description`, name format and length, name matching the directory."
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    ],
+                    "minItems": 1,
+                    "maxItems": 2
+                  }
+                ]
+              },
+              "context/no-unnecessary-agent-files": {
+                "description": "CLAUDE.md must not merely mirror AGENTS.md, which Claude Code reads itself",
+                "oneOf": [
+                  {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "warn",
+                          "error",
+                          "allow",
+                          "deny"
+                        ]
+                      },
+                      {
+                        "type": "integer",
+                        "enum": [
+                          0,
+                          1,
+                          2
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "prefixItems": [
+                      {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "off",
+                              "warn",
+                              "error",
+                              "allow",
+                              "deny"
+                            ]
+                          },
+                          {
+                            "type": "integer",
+                            "enum": [
+                              0,
+                              1,
+                              2
+                            ]
+                          }
+                        ]
+                      }
+                    ],
+                    "minItems": 1,
+                    "maxItems": 1
+                  }
+                ]
+              },
+              "no-unnecessary-agent-files": {
+                "description": "CLAUDE.md must not merely mirror AGENTS.md, which Claude Code reads itself",
+                "oneOf": [
+                  {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "warn",
+                          "error",
+                          "allow",
+                          "deny"
+                        ]
+                      },
+                      {
+                        "type": "integer",
+                        "enum": [
+                          0,
+                          1,
+                          2
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "prefixItems": [
+                      {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "off",
+                              "warn",
+                              "error",
+                              "allow",
+                              "deny"
+                            ]
+                          },
+                          {
+                            "type": "integer",
+                            "enum": [
+                              0,
+                              1,
+                              2
+                            ]
+                          }
+                        ]
+                      }
+                    ],
+                    "minItems": 1,
+                    "maxItems": 1
+                  }
+                ]
+              },
+              "context/keep-agents-file-up-to-date": {
+                "description": "Context files must be revisited regularly (judged by their last Git commit or modification time)",
+                "oneOf": [
+                  {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "warn",
+                          "error",
+                          "allow",
+                          "deny"
+                        ]
+                      },
+                      {
+                        "type": "integer",
+                        "enum": [
+                          0,
+                          1,
+                          2
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "prefixItems": [
+                      {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "off",
+                              "warn",
+                              "error",
+                              "allow",
+                              "deny"
+                            ]
+                          },
+                          {
+                            "type": "integer",
+                            "enum": [
+                              0,
+                              1,
+                              2
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "warnIfNotUpdatedForDays": {
+                            "description": "Report files not changed for more than this many days (by last commit, or by modification time for files without Git history).",
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "minimum": 0
+                              },
+                              {
+                                "type": "string",
+                                "pattern": "^[0-9]+$"
+                              }
+                            ]
+                          },
+                          "warnOnlyForFilesLongerThanChars": {
+                            "description": "Skip files with at most this many characters (ignoring surrounding whitespace), e.g. `@AGENTS.md` pointers.",
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "minimum": 0
+                              },
+                              {
+                                "type": "string",
+                                "pattern": "^[0-9]+$"
+                              }
+                            ]
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    ],
+                    "minItems": 1,
+                    "maxItems": 2
+                  }
+                ]
+              },
+              "keep-agents-file-up-to-date": {
+                "description": "Context files must be revisited regularly (judged by their last Git commit or modification time)",
+                "oneOf": [
+                  {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "warn",
+                          "error",
+                          "allow",
+                          "deny"
+                        ]
+                      },
+                      {
+                        "type": "integer",
+                        "enum": [
+                          0,
+                          1,
+                          2
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "prefixItems": [
+                      {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "off",
+                              "warn",
+                              "error",
+                              "allow",
+                              "deny"
+                            ]
+                          },
+                          {
+                            "type": "integer",
+                            "enum": [
+                              0,
+                              1,
+                              2
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "warnIfNotUpdatedForDays": {
+                            "description": "Report files not changed for more than this many days (by last commit, or by modification time for files without Git history).",
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "minimum": 0
+                              },
+                              {
+                                "type": "string",
+                                "pattern": "^[0-9]+$"
+                              }
+                            ]
+                          },
+                          "warnOnlyForFilesLongerThanChars": {
+                            "description": "Skip files with at most this many characters (ignoring surrounding whitespace), e.g. `@AGENTS.md` pointers.",
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "minimum": 0
+                              },
+                              {
+                                "type": "string",
+                                "pattern": "^[0-9]+$"
+                              }
+                            ]
                           }
                         },
                         "additionalProperties": false

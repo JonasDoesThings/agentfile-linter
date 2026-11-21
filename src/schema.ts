@@ -7,28 +7,54 @@ import { assertNever } from "./util.ts";
  */
 export type OptionSchema =
   | { type: "boolean"; description?: string; default?: boolean }
-  | { type: "number"; description?: string; default?: number }
-  | { type: "string"; description?: string; enum?: string[]; default?: string }
+  | { type: "number"; description?: string; minimum?: number; default?: number }
+  | { type: "string"; description?: string; enum?: string[]; pattern?: string; default?: string }
   | { type: "array"; description?: string; items: OptionSchema; default?: unknown[] }
   | {
       type: "object";
       description?: string;
       properties: Record<string, OptionSchema>;
       additionalProperties?: false;
-    };
+    }
+  | { anyOf: OptionSchema[]; description?: string; default?: unknown };
+
+/** What a value must be to match `schema`, for error messages (`a number >= 0`). */
+function expected(schema: OptionSchema): string {
+  if ("anyOf" in schema) return schema.anyOf.map(expected).join(" or ");
+  switch (schema.type) {
+    case "boolean":
+      return "a boolean";
+    case "number":
+      return schema.minimum === undefined ? "a number" : `a number >= ${schema.minimum}`;
+    case "string":
+      if (schema.enum) return `one of ${schema.enum.map((v) => JSON.stringify(v)).join(", ")}`;
+      return schema.pattern ? `a string matching /${schema.pattern}/` : "a string";
+    case "array":
+      return "an array";
+    case "object":
+      return "an object";
+    default:
+      return assertNever(schema);
+  }
+}
 
 /** Validates `value` against `schema`, returning a list of human-readable problems. */
 export function validate(schema: OptionSchema, value: unknown, path = "options"): string[] {
+  if ("anyOf" in schema) {
+    return schema.anyOf.some((option) => validate(option, value, path).length === 0)
+      ? []
+      : [`${path} must be ${expected(schema)}`];
+  }
   switch (schema.type) {
     case "boolean":
       return typeof value === "boolean" ? [] : [`${path} must be a boolean`];
     case "number":
-      return typeof value === "number" && Number.isFinite(value) ? [] : [`${path} must be a number`];
+      if (typeof value !== "number" || !Number.isFinite(value)) return [`${path} must be a number`];
+      return schema.minimum !== undefined && value < schema.minimum ? [`${path} must be ${expected(schema)}`] : [];
     case "string":
       if (typeof value !== "string") return [`${path} must be a string`];
-      if (schema.enum && !schema.enum.includes(value)) {
-        return [`${path} must be one of ${schema.enum.map((v) => JSON.stringify(v)).join(", ")}`];
-      }
+      if (schema.enum && !schema.enum.includes(value)) return [`${path} must be ${expected(schema)}`];
+      if (schema.pattern && !new RegExp(schema.pattern).test(value)) return [`${path} must be ${expected(schema)}`];
       return [];
     case "array":
       if (!Array.isArray(value)) return [`${path} must be an array`];
@@ -39,7 +65,8 @@ export function validate(schema: OptionSchema, value: unknown, path = "options")
       }
       const problems: string[] = [];
       for (const [key, v] of Object.entries(value)) {
-        const prop = schema.properties[key];
+        // `Object.hasOwn`: keys such as `toString` must not resolve to `Object.prototype` members.
+        const prop = Object.hasOwn(schema.properties, key) ? schema.properties[key] : undefined;
         if (!prop) {
           const known = Object.keys(schema.properties);
           problems.push(`${path} has unknown property "${key}"${known.length ? ` (known: ${known.join(", ")})` : ""}`);
@@ -56,6 +83,7 @@ export function validate(schema: OptionSchema, value: unknown, path = "options")
 
 /** Converts an option schema to a JSON schema fragment. */
 export function toJsonSchema(schema: OptionSchema): Record<string, unknown> {
+  if ("anyOf" in schema) return { ...schema, anyOf: schema.anyOf.map(toJsonSchema) };
   switch (schema.type) {
     case "boolean":
     case "number":

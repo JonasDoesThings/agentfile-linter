@@ -233,7 +233,7 @@ interface Setting {
 /** Computes the effective rule set for each file from built-in defaults, config and CLI flags. */
 export class RuleResolver {
   private readonly base: Map<string, Setting>;
-  private readonly cache = new Map<string, EnabledRule[]>();
+  private readonly cache = new Map<string, { settings: Map<string, Setting>; rules: EnabledRule[] }>();
 
   constructor(
     readonly config: Config,
@@ -294,23 +294,60 @@ export class RuleResolver {
     return enabled;
   }
 
-  /** Effective rules for a file (applies matching `overrides`). */
-  forFile(absPath: string): EnabledRule[] {
+  private resolveForFile(absPath: string, root?: string) {
     const matching = this.config.overrides
       .map((override, index) => ({ override, index }))
-      .filter(({ override }) => override.files.some((p) => matchesFilePattern(p, this.config.dir, absPath)));
+      .filter(({ override }) =>
+        override.files.some(
+          (p) =>
+            matchesFilePattern(p, this.config.dir, absPath) || (root && matchesFilePattern(p, this.config.dir, root)),
+        ),
+      );
     const key = matching.map((m) => m.index).join(",");
-    let rules = this.cache.get(key);
-    if (!rules) {
+    let resolved = this.cache.get(key);
+    if (!resolved) {
       const settings = new Map([...this.base].map(([k, v]) => [k, { ...v }]));
       // 4. Overrides in order.
       for (const { override } of matching) {
         for (const [name, setting] of override.rules) this.apply(settings, name, setting);
       }
-      rules = this.finalize(settings);
-      this.cache.set(key, rules);
+      resolved = { settings, rules: this.finalize(settings) };
+      this.cache.set(key, resolved);
     }
-    return rules;
+    return resolved;
+  }
+
+  /** Effective rules for a file (applies `overrides` matching it or, when given, `root`). */
+  forFile(absPath: string, root?: string): EnabledRule[] {
+    return this.resolveForFile(absPath, root).rules;
+  }
+
+  /** A rule's options at a path (with overrides matching it or `root`), even if the rule is off there. */
+  optionsFor(rule: AnyRule, absPath: string, root?: string): Record<string, unknown> {
+    return this.resolveForFile(absPath, root).settings.get(rule.meta.name)?.options ?? rule.defaultOptions;
+  }
+
+  /** Option layers that may introduce additional inputs. */
+  discoveryOptions(rule: AnyRule): Record<string, unknown>[] {
+    const name = rule.meta.name;
+    const layers = [this.base.get(name)?.options ?? rule.defaultOptions];
+    for (const override of this.config.overrides) {
+      const options = override.rules.get(name)?.options;
+      if (options) layers.push(options);
+    }
+    return layers;
+  }
+
+  /** Whether a rule can be enabled at any path in this run. */
+  canEnable(rule: AnyRule): boolean {
+    const name = rule.meta.name;
+    const flag = this.cliFlags.findLast(({ target }) => this.targetRules(target).includes(name));
+    if (flag) return flag.severity !== "off";
+    if (this.base.get(name)?.severity !== "off") return true;
+    return this.config.overrides.some(({ rules }) => {
+      const severity = rules.get(name)?.severity;
+      return severity === "warn" || severity === "error";
+    });
   }
 
   /** Effective rules for files not matched by any override. */

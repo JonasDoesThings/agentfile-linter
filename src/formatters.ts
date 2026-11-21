@@ -64,7 +64,7 @@ function formatDefault(result: LintResult, opts: FormatOptions): string {
       try {
         source = readFileSync(file.filePath, "utf8").split(/\r?\n/);
       } catch {
-        // unreadable: no code frame
+        // unreadable or a directory: no code frame
       }
     }
     const path = displayPath(opts.cwd, file.filePath);

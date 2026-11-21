@@ -1,5 +1,5 @@
 import { afterAll } from "bun:test";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -36,6 +36,43 @@ export function makeProject(files: Record<string, FileSpec>, { git = true } = {}
     }
   }
   return root;
+}
+
+/** Environment for test git commands: no user/system config, fixed identity. */
+function gitEnv(extra: Record<string, string>): Record<string, string | undefined> {
+  const env: Record<string, string | undefined> = {
+    ...process.env,
+    GIT_CONFIG_GLOBAL: "/dev/null",
+    GIT_CONFIG_NOSYSTEM: "1",
+    GIT_AUTHOR_NAME: "Test",
+    GIT_AUTHOR_EMAIL: "test@example.com",
+    GIT_COMMITTER_NAME: "Test",
+    GIT_COMMITTER_EMAIL: "test@example.com",
+    ...extra,
+  };
+  for (const name of ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"]) delete env[name];
+  return env;
+}
+
+/** Runs git in `root`; throws when it fails. */
+export function runGit(root: string, args: string[], env: Record<string, string> = {}): string {
+  const proc = Bun.spawnSync(["git", ...args], { cwd: root, env: gitEnv(env), stdout: "pipe", stderr: "pipe" });
+  if (proc.exitCode !== 0) throw new Error(`git ${args.join(" ")} failed: ${proc.stderr.toString()}`);
+  return proc.stdout.toString();
+}
+
+/**
+ * Commits `paths` (default: everything) in `root`, dated `daysAgo` days in the
+ * past. Initializes a repository first when there is none.
+ */
+export function commit(root: string, { daysAgo = 0, paths = ["."] }: { daysAgo?: number; paths?: string[] } = {}) {
+  if (!existsSync(join(root, ".git", "HEAD"))) runGit(root, ["init", "-q"]);
+  const date = `${Math.floor(Date.now() / 1000 - daysAgo * 24 * 60 * 60)} +0000`;
+  runGit(root, ["add", "--", ...paths]);
+  runGit(root, ["commit", "-q", "--no-verify", "-m", `${daysAgo} days ago`, "--", ...paths], {
+    GIT_AUTHOR_DATE: date,
+    GIT_COMMITTER_DATE: date,
+  });
 }
 
 export interface SimpleDiagnostic {

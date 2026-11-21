@@ -198,6 +198,7 @@ Inline Configuration Comments
   <!-- contextlint-disable-next-line context/no-missing-path -->
   <!-- contextlint-disable-line -->
   <!-- contextlint-disable context/no-missing-script --> ... <!-- contextlint-enable -->
+  # contextlint-disable-next-line context/no-invalid-skill    (in YAML frontmatter)
 
 Exit codes: 0 = no errors, 1 = lint errors (or warnings with --deny-warnings /
 --max-warnings), 2 = invalid usage or configuration.

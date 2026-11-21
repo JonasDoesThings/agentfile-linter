@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, readdirSync, readFileSync, type Stats, statSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, type Stats, statSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { GitIgnoreTree, toPosix } from "./gitignore.ts";
@@ -8,8 +8,19 @@ import { Workspaces } from "./workspace.ts";
 /** Directories that are never descended into, regardless of ignore files. */
 export const ALWAYS_SKIPPED_DIRS = new Set([".git", "node_modules"]);
 
-function isInside(relativePath: string): boolean {
-  return relativePath !== ".." && !relativePath.startsWith(`..${sep}`) && !isAbsolute(relativePath);
+/** Whether `path` is `dir` or inside it (lexically, without resolving symlinks). */
+export function isWithin(dir: string, path: string): boolean {
+  const rel = relative(dir, path);
+  return rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
+}
+
+/** The path with all symlinks resolved, or null when it doesn't exist (or a link is broken). */
+export function tryRealpath(path: string): string | null {
+  try {
+    return realpathSync(path);
+  } catch {
+    return null;
+  }
 }
 
 interface ProjectIndex {
@@ -17,6 +28,8 @@ interface ProjectIndex {
   files: string[];
   /** Root-relative POSIX paths of all non-ignored directories. */
   dirs: string[];
+  /** Root-relative POSIX paths of the non-ignored symlinks among `files` and `dirs`. */
+  symlinks: string[];
 }
 
 /**
@@ -99,7 +112,7 @@ export class Project {
 
   /** Whether `absPath` is inside the project root (or is the root). */
   contains(absPath: string): boolean {
-    return isInside(relative(this.root, absPath));
+    return isWithin(this.root, absPath);
   }
 
   /** Root-relative POSIX path. */
@@ -134,6 +147,7 @@ export class Project {
     if (this.index) return this.index;
     const files: string[] = [];
     const dirs: string[] = [];
+    const symlinks: string[] = [];
     const walk = (dir: string, rel: string) => {
       let entries: import("node:fs").Dirent[];
       try {
@@ -151,6 +165,7 @@ export class Project {
           isDir = this.isDirectory(abs);
           if (this.gitignore.isEntryIgnored(abs, isDir)) continue;
           (isDir ? dirs : files).push(entryRel);
+          symlinks.push(entryRel);
           continue;
         }
         if (this.gitignore.isEntryIgnored(abs, isDir)) continue;
@@ -163,7 +178,7 @@ export class Project {
       }
     };
     walk(this.root, "");
-    this.index = { files, dirs };
+    this.index = { files, dirs, symlinks };
     return this.index;
   }
 
@@ -325,7 +340,7 @@ export class ProjectRegistry {
   forDirectory(dir: string): Project {
     let root = this.rootCache.get(dir);
     if (!root) {
-      const fallback = this.fallbackRoots.find((base) => isInside(relative(base, dir))) ?? dir;
+      const fallback = this.fallbackRoots.find((base) => isWithin(base, dir)) ?? dir;
       root = findProjectRoot(dir, fallback);
       this.rootCache.set(dir, root);
     }

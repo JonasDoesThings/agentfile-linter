@@ -16,6 +16,7 @@ const ALL_ERROR: Record<string, string> = {
   "context/no-missing-script": "error",
   "context/no-broken-reference": "error",
   "context/no-agent-files-drift": "error",
+  "context/no-invalid-skill": "error",
 };
 
 describe("rule resolution", () => {
@@ -42,6 +43,7 @@ describe("rule resolution", () => {
       "context/no-missing-path": "warn",
       "context/no-missing-script": "warn",
       "context/no-agent-files-drift": "error",
+      "context/no-invalid-skill": "warn",
     });
   });
 
@@ -54,7 +56,7 @@ describe("rule resolution", () => {
     ]);
     expect(enabled(resolver)).toEqual({ "context/no-missing-path": "error", "context/no-missing-script": "warn" });
     const categories = new RuleResolver(config, [{ severity: "warn", target: "recommended" }]);
-    expect(Object.values(enabled(categories))).toEqual(["warn", "warn", "warn", "warn"]);
+    expect(Object.values(enabled(categories))).toEqual(["warn", "warn", "warn", "warn", "warn"]);
   });
 
   test("overrides apply to matching files", () => {
@@ -120,6 +122,8 @@ describe("config validation", () => {
     [{ rules: { "no-missing-paht": "error" } }, /Did you mean "context\/no-missing-path"/],
     [{ rules: { "no-missing-path": "loud" } }, /invalid severity "loud"/],
     [{ rules: { "no-missing-path": ["error", { nope: 1 }] } }, /unknown property "nope"/],
+    [{ rules: { "no-invalid-skill": ["error", { toString: 1 }] } }, /unknown property "toString"/],
+    [{ rules: { "no-missing-path": ["error", { constructor: 1 }] } }, /unknown property "constructor"/],
     [{ rules: { "no-missing-path": ["error", { ignore: "x" }] } }, /options.ignore must be an array/],
     [{ categories: { gemini: "error" } }, /unknown category "gemini"/],
     [{ plugins: [] }, /unknown property "plugins"/],

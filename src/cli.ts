@@ -30,7 +30,7 @@ const err = (s: string) => process.stderr.write(s);
 function listRules(): string {
   const rows = [...RULES.values()].map((r) => [
     r.meta.name,
-    r.meta.categories.join(", "),
+    r.meta.categories.join(", ") || "-",
     r.meta.defaultSeverity,
     r.meta.description,
   ]);

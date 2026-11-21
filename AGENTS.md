@@ -8,7 +8,8 @@ modeled on oxlint. See [README.md](README.md) for user-facing behavior.
 
 - `bun test` runs all tests. Unit tests sit next to the code they test (`src/**/*.test.ts`).
   Cross-cutting integration tests live in `test/`. Tests build throwaway projects in temp
-  directories with `makeProject()` from `test/helpers.ts`.
+  directories with `makeProject()` from `test/helpers.ts`. `commit()` from the same file
+  creates Git history with backdated commits.
 - `bun run typecheck` runs `tsc --noEmit`. Unused locals and parameters are errors.
 - `bun run lint` runs oxlint with type-aware rules (config: `.oxlintrc.jsonc`). `bun run lint:fix`
   applies the safe autofixes.
@@ -25,20 +26,27 @@ modeled on oxlint. See [README.md](README.md) for user-facing behavior.
 - Imports outside the current directory use the `package.json` subpath aliases `#src/*`,
   `#test/*` and `#package.json`, never `../`. Same-directory imports stay plain relative
   imports.
-- Rules must be deterministic and must not touch the network. Prefer false negatives over false
-  positives. When a heuristic is unsure, skip the check.
+- Rules must be deterministic and must not touch the network: results depend only on the linted
+  files, their Git history and the config, never on the environment or files outside the
+  project. The one exception is `context/keep-agents-file-up-to-date`, which compares dates with
+  the current time. Prefer false negatives over false positives. When a heuristic is unsure, skip
+  the check.
 
 ## Layout
 
 - `src/cli.ts`: entry point. Argument parsing is in `src/args.ts`.
 - `src/linter.ts`: config setup, file collection (`collectFiles`, also used by
-  `--debug files`), per-file rule execution.
+  `--debug files`), per-file rule execution, and the tree pass that runs `checkTree` hooks
+  over the discovered directories.
 - `src/config.ts`: config loading and validation, plus `RuleResolver`. Settings layer in this
   order: defaults → categories → rules → overrides → CLI flags.
 - `src/project.ts`: cached fs access, gitignore, a lazy index of project files, `findUp`,
   `resolveExisting`, `memo`.
 - `src/workspace.ts`: package.json and workspace (pnpm/npm/yarn/bun) resolution.
 - `src/shell.ts`: tokenizer, command splitting and code-block command extraction.
+- `src/frontmatter.ts`: YAML frontmatter extraction and parsing, with source locations for
+  syntax errors and duplicate keys.
+- `src/git.ts`: Git queries (last commit time, uncommitted changes) with a process limit.
 - `src/rules/`: one file per rule, plus its `<rule>.test.ts`. Rules are registered in
   `src/rules/index.ts`.
 - `src/runners/`: task runners used by `context/no-missing-script`, one module per ecosystem
@@ -50,7 +58,10 @@ modeled on oxlint. See [README.md](README.md) for user-facing behavior.
 ## Adding a rule
 
 1. Create `src/rules/<name>.ts` exporting a `Rule` with `meta` (name `context/<name>`,
-   `categories`, `defaultSeverity`, option `schema`), `defaultOptions` and `check()`.
+   `categories`, `defaultSeverity`, option `schema`), `defaultOptions` and `check()`. Rules
+   about things other than context files (such as skill directories) implement `checkTree()`
+   instead. It runs once per lint run and reports by path. Rules with no category are off by
+   default.
 2. Register it in `src/rules/index.ts`.
 3. Run `bun run schema`, add `src/rules/<name>.test.ts`, and document the rule in `README.md`.
 

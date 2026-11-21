@@ -23,6 +23,12 @@ export interface DiscoverOptions {
 export interface DiscoveryResult {
   /** Absolute paths of files to lint, sorted. */
   files: string[];
+  /** Absolute paths of discovered directories, including symlink entries without walking through them. */
+  directories: string[];
+  /** Absolute paths explicitly selected as directories or implicitly selected by default. */
+  directoryInputs: string[];
+  /** Explicitly named, non-excluded files, before symlink deduplication. */
+  explicitFiles: string[];
   /** Explicitly named files excluded by a configured ignore pattern. */
   ignoredFiles: string[];
   /** Input paths that don't exist. */
@@ -33,6 +39,9 @@ export interface DiscoveryResult {
 
 export function discoverFiles(options: DiscoverOptions): DiscoveryResult {
   const files = new Set<string>();
+  const walked = new Set<string>();
+  const linkedDirectories = new Set<string>();
+  const explicitFiles = new Set<string>();
   const ignoredFiles = new Set<string>();
   const missing: string[] = [];
   const unreadableDirectories = new Map<string, string>();
@@ -42,6 +51,7 @@ export function discoverFiles(options: DiscoverOptions): DiscoveryResult {
     options.filePatterns.some((pattern) => matchesFilePattern(pattern, options.patternBase, abs));
 
   const walk = (dir: string) => {
+    if (walked.has(dir)) return;
     const project = options.registry.forDirectory(dir);
     let entries: Dirent[];
     try {
@@ -50,6 +60,7 @@ export function discoverFiles(options: DiscoverOptions): DiscoveryResult {
       unreadableDirectories.set(dir, (error as NodeJS.ErrnoException).code ?? "unknown error");
       return;
     }
+    walked.add(dir);
     for (const entry of entries) {
       const abs = join(dir, entry.name);
       let isDir = entry.isDirectory();
@@ -66,7 +77,8 @@ export function discoverFiles(options: DiscoverOptions): DiscoveryResult {
       if (explicitlyIgnored(abs, isDir)) continue;
       if (isDir) {
         // Symlinked directories are not followed (avoids cycles and duplicates).
-        if (!isLink) walk(abs);
+        if (isLink) linkedDirectories.add(abs);
+        else walk(abs);
       } else if (isContextFile(abs)) {
         files.add(abs);
       }
@@ -90,12 +102,16 @@ export function discoverFiles(options: DiscoverOptions): DiscoveryResult {
     } else {
       // Explicitly named files bypass discovery patterns and .gitignore.
       files.add(abs);
+      explicitFiles.add(abs);
     }
   }
   options.registry.setScanDirectories([...directories]);
   for (const dir of directories) walk(dir);
   return {
     files: [...files].toSorted(),
+    directories: [...new Set([...walked, ...linkedDirectories])].toSorted(),
+    directoryInputs: [...directories],
+    explicitFiles: [...explicitFiles],
     ignoredFiles: [...ignoredFiles].toSorted(),
     missing,
     unreadableDirectories,

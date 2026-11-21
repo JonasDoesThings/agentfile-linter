@@ -93,7 +93,9 @@ describe("cli", () => {
     expect(config).toEqual({ categories: { recommended: "error" }, rules: {}, ignorePatterns: [] });
     expect((await cli(root, "--init")).code).toBe(2);
 
-    expect((await cli(root, "--rules")).stdout).toContain("context/no-agent-files-drift  recommended  error");
+    const rules = (await cli(root, "--rules")).stdout;
+    expect(rules).toMatch(/^context\/no-agent-files-drift +recommended +error /m);
+    expect(rules).toMatch(/^context\/keep-agents-file-up-to-date +- +warn /m);
     const printed = JSON.parse((await cli(root, "--print-config", "-A", "no-missing-script")).stdout);
     expect(printed.configFile).toBe(".contextlintrc.json");
     expect(printed.rules["context/no-missing-script"]).toBe("off");
@@ -128,6 +130,20 @@ describe("cli", () => {
     );
   });
 
+  test("--debug files lists selected skills and exits successfully without linting", async () => {
+    const root = makeProject({
+      "custom/a/SKILL.md": "# Missing frontmatter\n",
+      "custom/b/SKILL.md": "# Missing frontmatter\n",
+      ".gitignore": "custom/b/\n",
+      ".contextlintrc.json": {
+        overrides: [{ files: ["custom/**"], rules: { "no-invalid-skill": ["error", { directories: ["custom"] }] } }],
+      },
+    });
+    expect((await cli(root)).code).toBe(1);
+    expect(await cli(root, "--debug=files")).toMatchObject({ code: 0, stdout: "custom/a/SKILL.md\n", stderr: "" });
+    expect((await cli(root, "--debug=files", "-A", "no-invalid-skill")).stdout).toBe("");
+  });
+
   test("--debug rejects unknown options", async () => {
     const { code, stderr } = await cli(makeProject({}), "--debug", "files,timings");
     expect(code).toBe(2);
@@ -139,6 +155,21 @@ describe("cli", () => {
     const { stderr, code } = await cli(root);
     expect(code).toBe(0);
     expect(stderr).toContain("No context files found");
+  });
+
+  test("counts a clean skill when invoked inside its directory", async () => {
+    const files = {
+      ".agents/skills/demo/SKILL.md": "---\nname: demo\ndescription: Demonstrates linting.\n---\n# Demo\n",
+    };
+    const root = makeProject(files);
+    const { code, stdout, stderr } = await cli(join(root, ".agents", "skills", "demo"));
+    expect(code).toBe(0);
+    expect(stdout).toContain("on 1 file with 1 rule");
+    expect(stderr).toBe("");
+
+    // Without Git, the project is the skill directory: the skills directory above it is outside.
+    const outside = makeProject(files, { git: false });
+    expect((await cli(join(outside, ".agents", "skills", "demo"))).stdout).toContain("on 0 files");
   });
 
   test("warns when an explicitly named file is skipped by a configured ignore", async () => {
