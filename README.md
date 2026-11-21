@@ -1,11 +1,8 @@
 # agentfile-linter
 
-A linter for AI agent context files: `AGENTS.md`, `CLAUDE.md`, `GEMINI.md` and friends.
-Its rules are deterministic (except the opt-in date check of `keep-agents-file-up-to-date`), and its CLI and config format are modeled on [oxlint](https://oxc.rs/docs/guide/usage/linter/cli.html).
+A deterministic oxlint-inspired linter for AI agent context files: `AGENTS.md`, `CLAUDE.md`, `GEMINI.md` and friends.
 
-Context files rot fast. A file gets renamed, a script disappears from `package.json`, or someone
-edits `CLAUDE.md` but forgets `AGENTS.md`. The agent then follows stale instructions. agentfile-linter
-catches these problems in CI.
+Context files rot fast. A file gets renamed, a script disappears from `package.json`, or someone edits `CLAUDE.md` but forgets `AGENTS.md`. The agent then follows stale instructions. agentfile-linter catches these problems in CI.
 
 ```console
 $ agentfile-linter .
@@ -51,23 +48,11 @@ With no config file and no rule flags, every rule in the `recommended` category 
 
 ### Linted files
 
-By default, agentfile-linter finds these files in every directory: `AGENTS.md`, `AGENT.md`,
-`CLAUDE.md`, `CLAUDE.local.md` and `GEMINI.md`. `.claude/` and other hidden directories are
-included. Discovery skips `node_modules`, `.git` and everything excluded by `.gitignore`. If one
-file is a symlink to another, it is linted only once.
+By default, agentfile-linter finds these files in every directory: `AGENTS.md`, `AGENT.md`, `CLAUDE.md`, `CLAUDE.local.md` and `GEMINI.md`. `.claude/` and other hidden directories are included. Discovery skips files excluded by `.gitignore`.
 
-Files you name on the command line can have any name and bypass `.gitignore`. A file explicitly
-excluded by `ignorePatterns`, `--ignore-pattern`, or the ignore file is skipped with a warning.
-Use `--no-ignore` to lint it.
+Files you name on the command line can have any name and bypass `.gitignore`. A file explicitly excluded by `ignorePatterns`, `--ignore-pattern`, or the ignore file is skipped with a warning. Use `--no-ignore` to lint it.
 
-Besides context files, [`agentfile/no-invalid-skill`](#agentfileno-invalid-skill) checks the skill
-directories (`.claude/skills/`, `.agents/skills/`, …) below the linted directories, with the same
-ignore rules. You can also name a skill directory or its `SKILL.md` directly. A named `SKILL.md`
-is checked only by `agentfile/no-invalid-skill`; where that rule is off, the file is skipped with a
-warning. Checked skill files count toward the lint totals.
-[`agentfile/no-misnamed-agent-file`](#agentfileno-misnamed-agent-file) also looks at the names of the
-other files in the linted directories, to find agent files that discovery misses because of their
-case (`agents.md`).
+Besides context files, [`agentfile/no-invalid-skill`](#agentfileno-invalid-skill) checks the skill directories (`.claude/skills/`, `.agents/skills/`, …) below the linted directories, with the same ignore rules. You can also name a skill directory or its `SKILL.md` directly. A named `SKILL.md` is checked only by `agentfile/no-invalid-skill`; where that rule is off, the file is skipped with a warning. Checked skill files count toward the lint totals. [`agentfile/no-misnamed-agent-file`](#agentfileno-misnamed-agent-file) also looks at the names of the other files in the linted directories, to find agent files that discovery misses because of their case (`agents.md`).
 
 ### Options
 
@@ -90,11 +75,9 @@ case (`agents.md`).
 | `--debug=<options>`      | Debug output, comma-separated. `files`: print the files that would be linted, then exit                  |
 | `--rules`                | List all rules                                                                                           |
 
-`-A`/`-W`/`-D` are applied left to right, after the config file. A rule name can be written with
-or without its `agentfile/` prefix.
+`-A`/`-W`/`-D` are applied left to right, after the config file. A rule name can be written with or without its `agentfile/` prefix.
 
-**Exit codes:** `0` means no errors. `1` means lint errors were found, or warnings exceeded
-`--deny-warnings` / `--max-warnings`. `2` means invalid usage or configuration.
+**Exit codes:** `0` means no errors. `1` means lint errors were found, or warnings exceeded `--deny-warnings` / `--max-warnings`. `2` means invalid usage or configuration.
 
 ## Configuration
 
@@ -116,14 +99,9 @@ or without its `agentfile/` prefix.
 }
 ```
 
-Settings are applied in this order: built-in defaults (`recommended` rules as errors), then
-`categories`, then `rules`, then matching `overrides`, then CLI flags. Each layer only changes
-what it mentions, including individual keys in a rule's options object. The example above keeps
-`no-broken-reference`, `no-agent-files-drift`, `no-invalid-skill` and `no-misnamed-agent-file` enabled. To opt out entirely, use
-`"categories": { "recommended": "off" }` or `-A all`.
+Settings are applied in this order: built-in defaults (`recommended` rules as errors), then `categories`, then `rules`, then matching `overrides`, then CLI flags. Each layer only changes what it mentions, including individual keys in a rule's options object. The example above keeps `no-broken-reference`, `no-agent-files-drift`, `no-invalid-skill` and `no-misnamed-agent-file` enabled. To opt out entirely, use `"categories": { "recommended": "off" }` or `-A all`.
 
-Glob patterns (`files`, `overrides[].files`, `ignorePatterns`) are resolved relative to the
-config file. A pattern without a `/` matches a file name in any directory.
+Glob patterns (`files`, `overrides[].files`, `ignorePatterns`) are resolved relative to the config file. A pattern without a `/` matches a file name in any directory.
 
 Severities accept `"off"`/`"allow"`/`0`, `"warn"`/`1` and `"error"`/`"deny"`/`2`.
 
@@ -141,9 +119,7 @@ Create `src/new-feature.ts` for the new feature.
 <!-- agentfile-linter-enable no-missing-script -->
 ```
 
-Frontmatter has to start on the first line, so it takes the same directives as YAML comments. A
-`# agentfile-linter-disable` comment in frontmatter also covers the opening `---`, where problems with
-the frontmatter as a whole (such as a missing field) are reported.
+Frontmatter has to start on the first line, so it takes the same directives as YAML comments. A `# agentfile-linter-disable` comment in frontmatter also covers the opening `---`, where problems with the frontmatter as a whole (such as a missing field) are reported.
 
 ```markdown
 ---
@@ -171,36 +147,19 @@ errors, so they don't change the exit code, and `--quiet` hides them.
 | [`agentfile/no-unnecessary-agent-files`](#agentfileno-unnecessary-agent-files)   | –           | No `CLAUDE.md` that only mirrors `AGENTS.md`                              |
 | [`agentfile/keep-agents-file-up-to-date`](#agentfilekeep-agents-file-up-to-date) | –           | Context files were changed recently                                       |
 
-Rules in the `recommended` category run by default. The others are off until you enable them in
-`rules`, e.g. `"agentfile/keep-agents-file-up-to-date": "warn"`.
+Rules in the `recommended` category run by default. The others are off until you enable them in `rules`, e.g. `"agentfile/keep-agents-file-up-to-date": "warn"`.
 
 ### `agentfile/no-missing-path`
 
-Checks inline code spans that look like paths, plus `@path/to/file.md` imports (the import
-syntax of Claude Code and Gemini CLI).
+Checks inline code spans that look like paths, plus `@path/to/file.md` imports (the import syntax of Claude Code and Gemini CLI).
 
-- **What counts as a path:** a span with a known file extension (`src/index.ts`, `package.json`),
-  a `./` or `../` prefix, a trailing slash (`docs/`), a dotfile (`.env.example`), a well-known
-  file name (`Makefile`, `Dockerfile`, …) or a glob (`src/**/*.test.ts`).
-- **Slash paths without an extension** (`src/components`) are checked only when their first
-  segment exists. Module names like `react-dom/client` or `origin/main` are therefore ignored.
-- **Never treated as paths:** commands, URLs, `node:` specifiers, scoped packages, absolute or
-  `~` paths, placeholders (`<name>`, `{id}`, `path/to/…`, `foo.ts`), extension mentions (`.ts`,
-  `.d.ts`, `.tscn`), API members (`Bun.sql`, `res.json`) and library names (`Node.js`,
-  `postgres.js`).
-- **Examples are skipped:** spans introduced by "e.g." / "such as" / "like", spans in a
-  paragraph ending with `:` that is followed by a code block ("With the following
-  `frontend.tsx`:"), and file names declared on code fences (` ```tsx#frontend.tsx `,
-  ` ```ts title="src/app.ts" `).
-- **Build outputs are accepted:** a missing `main.js` or `app.css` passes when its source
-  (`main.ts`, `app.scss`) exists.
-- **Resolution:** a path is looked up from the file's directory, then from each parent directory
-  up to the project root (the nearest `.git`). With `allowSuffixMatch`, it also passes if any
-  project path ends with it, so `components/Button.tsx` matches
-  `apps/web/src/components/Button.tsx`. `./x` paths and `@imports` resolve only relative to the
-  file.
-- **Not reported:** git-ignored paths (build output, `.env`) and paths under `node_modules`.
-  These legitimately don't exist in a fresh checkout.
+- **What counts as a path:** a span with a known file extension (`src/index.ts`, `package.json`), a `./` or `../` prefix, a trailing slash (`docs/`), a dotfile (`.env.example`), a well-known file name (`Makefile`, `Dockerfile`, …) or a glob (`src/**/*.test.ts`).
+- **Slash paths without an extension** (`src/components`) are checked only when their first segment exists. Module names like `react-dom/client` or `origin/main` are therefore ignored.
+- **Never treated as paths:** commands, URLs, `node:` specifiers, scoped packages, absolute or `~` paths, placeholders (`<name>`, `{id}`, `path/to/…`, `foo.ts`), extension mentions (`.ts`, `.d.ts`, `.tscn`), API members (`Bun.sql`, `res.json`) and library names (`Node.js`, `postgres.js`).
+- **Examples are skipped:** spans introduced by "e.g." / "such as" / "like", spans in a paragraph ending with `:` that is followed by a code block ("With the following `frontend.tsx`:"), and file names declared on code fences (` ```tsx#frontend.tsx `,` ```ts title="src/app.ts" `).
+- **Build outputs are accepted:** a missing `main.js` or `app.css` passes when its source (`main.ts`, `app.scss`) exists.
+- **Resolution:** a path is looked up from the file's directory, then from each parent directory up to the project root (the nearest `.git`). With `allowSuffixMatch`, it also passes if any project path ends with it, so `components/Button.tsx` matches `apps/web/src/components/Button.tsx`. `./x` paths and `@imports` resolve only relative to the file.
+- **Not reported:** git-ignored paths (build output, `.env`) and paths under `node_modules`. These legitimately don't exist in a fresh checkout.
 - Code spans inside links are left to `no-broken-reference`. Fenced code blocks are not checked.
 
 | Option             | Default | Description                                       |
@@ -211,18 +170,11 @@ syntax of Claude Code and Gemini CLI).
 
 ### `agentfile/no-missing-script`
 
-Finds task-runner commands in inline code and in shell code blocks (`sh`, `bash`, `console`,
-untagged, …). It then checks that the script, target or task exists where the command would
-run.
+Finds task-runner commands in inline code and in shell code blocks (`sh`, `bash`, `console`, untagged, …). It then checks that the script, target or task exists where the command would run.
 
-- **Working directory:** the context file's directory. `cd dir && …` is followed, and so is
-  `cd` across the lines of one code block. Relative directories (`cd apps/web`,
-  `make -C sub`) are resolved from the file's directory first, then from its parent directories
-  up to the project root.
-- **Config files are searched upward.** That covers `package.json`, `Makefile`, `justfile` and
-  the others in the table below.
-- **Nested commands:** commands run through wrappers (`uv run make build`,
-  `poetry run task test`) are checked by the runner for the inner command.
+- **Working directory:** the context file's directory. `cd dir && …` is followed, and so is `cd` across the lines of one code block. Relative directories (`cd apps/web`, `make -C sub`) are resolved from the file's directory first, then from its parent directories up to the project root.
+- **Config files are searched upward.** That covers `package.json`, `Makefile`, `justfile` and the others in the table below.
+- **Nested commands:** commands run through wrappers (`uv run make build`, `poetry run task test`) are checked by the runner for the inner command.
 - **Prefixes:** `sudo`, `time`, `env`, `corepack` and `VAR=value` are skipped.
 
 | Runner                                          | Commands                                                                | Checks                                                                                                                                                                  |
@@ -241,29 +193,16 @@ run.
 | `composer`                                      | `composer run-script x`, `composer run x`                               | `composer.json` scripts                                                                                                                                                 |
 | `cargo`                                         | `cargo … -p pkg --bin x`                                                | Workspace packages (`-p`) and `--bin` / `--example` / `--test` / `--bench` targets, including auto-discovered ones                                                      |
 
-Each runner stays quiet when it can't decide statically. Examples: computed Makefile targets
-(`$(BIN):`), templated Taskfile includes, Gradle composite builds, plugin goals
-(`mvn spring-boot:run`) and custom Composer or Cargo subcommands. `task` is a common word, so
-it is only checked in projects that use go-task or taskipy.
+Each runner stays quiet when it can't decide statically. Examples: computed Makefile targets (`$(BIN):`), templated Taskfile includes, Gradle composite builds, plugin goals (`mvn spring-boot:run`) and custom Composer or Cargo subcommands. `task` is a common word, so it is only checked in projects that use go-task or taskipy.
 
 **npm, pnpm, yarn and bun in detail:**
 
-- **Built-ins are ignored.** That covers built-in commands (`pnpm install`, `bun test`,
-  `pnpm deploy`, …) and `--if-present`.
-- **Target package:** the nearest `package.json`. Supported overrides:
-  `pnpm --filter <sel>`/`-F`, `pnpm -r`, `pnpm -w`, `pnpm -C <dir>`, `npm -w <name|path>`,
-  `npm -ws`, `npm --prefix`, `yarn workspace <name>`, `yarn workspaces foreach`, `yarn --cwd`,
-  `bun --filter` and `bun --cwd`. Workspaces come from `pnpm-workspace.yaml` or
-  `package.json#workspaces`.
-- **Filter selectors:** exact names, unscoped names (`web` → `@acme/web`), name globs
-  (`@acme/*`), paths (`./apps/web`, `{apps/*}`) and graph selectors (`web...`). Exclusions and
-  git ranges are skipped.
-- **Binary fallback:** `pnpm`, `yarn` and `bun` also run binaries, so `pnpm tsc` passes when a
-  dependency provides `tsc`. `npm run` and `pnpm run` require a script.
-- **Bun entry files:** `bun run tool.ts` and `bun tool.ts` also pass when the named file exists in
-  the command's working directory.
-- **Hints:** the help text says which other package defines the script, or lists the scripts
-  that are available.
+- **Built-ins are ignored.** That covers built-in commands (`pnpm install`, `bun test`, `pnpm deploy`, …) and `--if-present`.
+- **Target package:** the nearest `package.json`. Supported overrides: `pnpm --filter <sel>`/`-F`, `pnpm -r`, `pnpm -w`, `pnpm -C <dir>`, `npm -w <name|path>`, `npm -ws`, `npm --prefix`, `yarn workspace <name>`, `yarn workspaces foreach`, `yarn --cwd`, `bun --filter` and `bun --cwd`. Workspaces come from `pnpm-workspace.yaml` or `package.json#workspaces`.
+- **Filter selectors:** exact names, unscoped names (`web` → `@acme/web`), name globs (`@acme/*`), paths (`./apps/web`, `{apps/*}`) and graph selectors (`web...`). Exclusions and git ranges are skipped.
+- **Binary fallback:** `pnpm`, `yarn` and `bun` also run binaries, so `pnpm tsc` passes when a dependency provides `tsc`. `npm run` and `pnpm run` require a script.
+- **Bun entry files:** `bun run tool.ts` and `bun tool.ts` also pass when the named file exists in the command's working directory.
+- **Hints:** the help text says which other package defines the script, or lists the scripts that are available.
 
 | Option          | Default | Description                                                                                                                                                                                                                              |
 | --------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -274,15 +213,10 @@ it is only checked in projects that use go-task or taskipy.
 
 Checks relative Markdown links, images, reference definitions and `href`/`src` in inline HTML.
 
-- `#anchor` must match a heading in the same file, using GitHub-style slugs. Duplicate headings
-  get `-1`, `-2` suffixes. Explicit `id`/`name` anchors also count.
+- `#anchor` must match a heading in the same file, using GitHub-style slugs. Duplicate headings get `-1`, `-2` suffixes. Explicit `id`/`name` anchors also count.
 - `other.md#anchor` must match a heading in the target Markdown file.
 - Line fragments (`src/app.ts#L42`, `#L42-L50`, `#L42-50`, `#L10C5-L12C20`) must point at lines
-  that exist in the target file. Line numbers start at 1, and a range must not end before it
-  starts. GitHub renders Markdown files, so there `#L10` is checked as a heading anchor, unless
-  the link opens the source view (`guide.md?plain=1#L10`, `?plain=1#L10` for the linted file).
-  Directories, binary files, Git LFS pointers and git-ignored files (often generated) are not
-  checked.
+  that exist in the target file. Line numbers start at 1, and a range must not end before it starts. GitHub renders Markdown files, so there `#L10` is checked as a heading anchor, unless the link opens the source view (`guide.md?plain=1#L10`, `?plain=1#L10` for the linted file). Directories, binary files, Git LFS pointers and git-ignored files (often generated) are not checked.
 - Root-relative links (`/docs/x.md`) resolve against the project root, as on GitHub.
 - External URLs (`https:`, `mailto:`, `//cdn…`) and git-ignored targets are skipped.
 
@@ -294,17 +228,13 @@ Checks relative Markdown links, images, reference definitions and `href`/`src` i
 
 ### `agentfile/no-agent-files-drift`
 
-The agent files in one directory (`AGENTS.md`, `AGENT.md`, `CLAUDE.md`, `GEMINI.md`) must have
-the same effective content. A file passes when it:
+The agent files in one directory (`AGENTS.md`, `AGENT.md`, `CLAUDE.md`, `GEMINI.md`) must have the same effective content. A file passes when it:
 
 - is a symlink to another file in the group,
 - has identical text (differences in BOM, line endings and trailing whitespace are ignored), or
-- is a pointer whose only content is an import, e.g. `CLAUDE.md` containing `@AGENTS.md`. This
-  is allowed by default (`allowImports`).
+- is a pointer whose only content is an import, e.g. `CLAUDE.md` containing `@AGENTS.md`. This is allowed by default (`allowImports`).
 
-The first existing file in `files` order is canonical. Every other file is compared with it, and
-a mismatch is reported at its first differing line. `CLAUDE.local.md` is personal and is not
-part of the group.
+The first existing file in `files` order is canonical. Every other file is compared with it, and a mismatch is reported at its first differing line. `CLAUDE.local.md` is personal and is not part of the group.
 
 | Option         | Default                                               | Description                                          |
 | -------------- | ----------------------------------------------------- | ---------------------------------------------------- |
@@ -313,114 +243,62 @@ part of the group.
 
 ### `agentfile/no-invalid-skill`
 
-Checks [Agent Skills](https://agentskills.io/specification) instead of context files. It looks
-for skills directories below the linted directories: `.claude/skills`, `.agents/skills`,
-`.github/skills`, `.codex/skills`, `.gemini/skills`, `.cursor/skills`, `.devin/skills`,
-`.windsurf/skills` and `.kiro/skills` at any depth. It also checks the `skills/` directory of every
-Claude Code plugin (a directory in the project with `.claude-plugin/plugin.json`). Git-ignored skills and skills
-matching `ignorePatterns` are skipped.
+Checks [Agent Skills](https://agentskills.io/specification) instead of context files. It looks for skills directories below the linted directories: `.claude/skills`, `.agents/skills`, `.github/skills`, `.codex/skills`, `.gemini/skills`, `.cursor/skills`, `.devin/skills`, `.windsurf/skills` and `.kiro/skills` at any depth. It also checks the `skills/` directory of every Claude Code plugin (a directory in the project with `.claude-plugin/plugin.json`). Git-ignored skills and skills matching `ignorePatterns` are skipped.
 
-Skills directories are matched by their path relative to the project root (the Git root, or the
-linted directory outside Git), never by directories above it. In a repository whose root is a
-`.claude` directory, configure `"directories": ["skills"]`.
+Skills directories are matched by their path relative to the project root (the Git root, or the linted directory outside Git), never by directories above it. In a repository whose root is a `.claude` directory, configure `"directories": ["skills"]`.
 
 **Layout.** Each skill is a directory containing a file named exactly `SKILL.md`. Reported:
 
-- a `deploy.md` with `name` and `description` frontmatter, or a `SKILL.md`, placed directly in the skills directory
-  (it belongs in `deploy/SKILL.md`),
+- a `deploy.md` with `name` and `description` frontmatter, or a `SKILL.md`, placed directly in the skills directory (it belongs in `deploy/SKILL.md`),
 - `skill.md`, `Skills.md` and other spellings, which are not found on case-sensitive file systems,
 - a skill directory with no `SKILL.md` but another Markdown file with skill metadata,
-- broken symbolic links in the skills root or at `SKILL.md`. Symlinked skills roots and skill
-  directories are followed, and so are skills roots up to three levels below a symlinked directory
-  (such as `.claude -> ../shared/.claude`).
+- broken symbolic links in the skills root or at `SKILL.md`. Symlinked skills roots and skill directories are followed, and so are skills roots up to three levels below a symlinked directory (such as `.claude -> ../shared/.claude`).
 
-Grouping folders (`skills/review/security/SKILL.md`, supported by Codex, Cursor and OpenCode) are
-accepted, and the skills inside them are checked, also below a misnamed `skill.md`. Folders
-without Markdown files, such as shared scripts, are left alone.
+Grouping folders (`skills/review/security/SKILL.md`, supported by Codex, Cursor and OpenCode) are accepted, and the skills inside them are checked, also below a misnamed `skill.md`. Folders without Markdown files, such as shared scripts, are left alone.
 
 **Frontmatter.** Always checked:
 
 - It starts on the first line and is closed with `---`.
-- It is valid YAML. Errors are reported at the failing line. The most common mistake is an
-  unquoted `: ` inside a value (`description: Use when: …`). Claude Code tolerates this in
-  `description`, but the stricter YAML parsers of other agents reject the whole frontmatter.
-  `argument-hint: [file] [format]` fails the same way. Quote such values.
+- It is valid YAML. Errors are reported at the failing line. The most common mistake is an unquoted `: ` inside a value (`description: Use when: …`). Claude Code tolerates this in `description`, but the stricter YAML parsers of other agents reject the whole frontmatter. `argument-hint: [file] [format]` fails the same way. Quote such values.
 - It is a mapping without duplicate keys.
-- Known fields have valid values. Booleans such as `disable-model-invocation` (`yes`/`no` are
-  accepted, as in Claude Code), `context: fork`, `effort`, `shell`, `metadata` and `hooks`
-  mappings, tool lists, a non-empty `description`, and `compatibility` of at most 500 characters.
-- Unknown fields are allowed, since agents ignore them. They are only reported when they look
-  like a misspelled known field (`descripton`, `allowed_tools`). Keys close to short fields
-  (`models`, `content`) are left alone, as they are more likely custom fields than typos.
+- Known fields have valid values. Booleans such as `disable-model-invocation` (`yes`/`no` are accepted, as in Claude Code), `context: fork`, `effort`, `shell`, `metadata` and `hooks` mappings, tool lists, a non-empty `description`, and `compatibility` of at most 500 characters.
+- Unknown fields are allowed, since agents ignore them. They are only reported when they look like a misspelled known field (`descripton`, `allowed_tools`). Keys close to short fields (`models`, `content`) are left alone, as they are more likely custom fields than typos.
 
-**Agent Skills specification** (`spec`, on by default). `name` and `description` are required.
-`name` has at most 64 lowercase letters, digits and hyphens, with no leading, trailing or double
-hyphen, and matches its directory. `description` has at most 1024 characters. Claude Code treats
-all fields as optional, but Codex, GitHub Copilot, Cursor and Gemini CLI need them. Set
-`spec: false` for skills that only Claude Code uses.
+**Agent Skills specification** (`spec`, on by default). `name` and `description` are required. `name` has at most 64 lowercase letters, digits and hyphens, with no leading, trailing or double hyphen, and matches its directory. `description` has at most 1024 characters. Claude Code treats all fields as optional, but Codex, GitHub Copilot, Cursor and Gemini CLI need them. Set `spec: false` for skills that only Claude Code uses.
 
 | Option        | Default     | Description                                                                            |
 | ------------- | ----------- | -------------------------------------------------------------------------------------- |
 | `directories` | (see above) | Glob patterns of skills directories, relative to the project root. Replaces the list   |
 | `spec`        | `true`      | Enforce the Agent Skills specification (required fields, name format, lengths, naming) |
 
-`overrides` apply per skill. For example, `"files": [".claude/skills/legacy/**"]` changes the
-rule for one skill. An override can match the skill file or the skills root; one that matches the
-skills root (`"files": ["custom"]`) applies its severity and all options to every skill in it.
+`overrides` apply per skill. For example, `"files": [".claude/skills/legacy/**"]` changes the rule for one skill. An override can match the skill file or the skills root; one that matches the skills root (`"files": ["custom"]`) applies its severity and all options to every skill in it.
 
 ### `agentfile/no-misnamed-agent-file`
 
-Agents look for `AGENTS.md`, `AGENT.md`, `CLAUDE.md`, `CLAUDE.local.md` and `GEMINI.md` by their
-exact name. On case-insensitive file systems (the macOS and Windows default), `agents.md` or
-`CLAUDE.MD` is found anyway, so the mistake goes unnoticed until a teammate or CI runs on Linux,
-where the file is silently ignored. This rule reports such files:
+Agents look for `AGENTS.md`, `AGENT.md`, `CLAUDE.md`, `CLAUDE.local.md` and `GEMINI.md` by their exact name. On case-insensitive file systems (the macOS and Windows default), `agents.md` or `CLAUDE.MD` is found anyway, so the mistake goes unnoticed until a teammate or CI runs on Linux, where the file is silently ignored. This rule reports such files:
 
-- A name that only differs in the case of its extension (`AGENTS.MD`, `CLAUDE.Md`) is reported
-  anywhere.
-- A name like `agents.md` or `Claude.md` is also common for documentation pages and prompts, so it
-  is only reported where context files are expected: in the project root, next to a correctly named
-  context file, in a package directory (one with `package.json`, `Cargo.toml`, `pyproject.toml`,
-  `go.mod`, …) and, for `claude.md`, in `.claude/`. It is not reported when other Markdown pages
-  with lowercase names (`index.md`, `guide.md`) sit next to it, as in a documentation folder.
-  `README.md` and other uppercase names don't count as pages.
+- A name that only differs in the case of its extension (`AGENTS.MD`, `CLAUDE.Md`) is reported anywhere.
+- A name like `agents.md` or `Claude.md` is also common for documentation pages and prompts, so it is only reported where context files are expected: in the project root, next to a correctly named context file, in a package directory (one with `package.json`, `Cargo.toml`, `pyproject.toml`, `go.mod`, …) and, for `claude.md`, in `.claude/`. It is not reported when other Markdown pages with lowercase names (`index.md`, `guide.md`) sit next to it, as in a documentation folder. `README.md` and other uppercase names don't count as pages.
 
-A file is never reported when the correctly named file exists next to it (possible on
-case-sensitive file systems) or when it matches the [`files`](#options) patterns, and git-ignored
-files are skipped unless named on the command line. A `SKILL.md` in the wrong case is reported by
-[`agentfile/no-invalid-skill`](#agentfileno-invalid-skill). Rename tracked files with
-`git mv`: on case-insensitive file systems, Git doesn't notice a plain rename that only changes
-case.
+A file is never reported when the correctly named file exists next to it (possible on case-sensitive file systems) or when it matches the [`files`](#options) patterns, and git-ignored files are skipped unless named on the command line. A `SKILL.md` in the wrong case is reported by [`agentfile/no-invalid-skill`](#agentfileno-invalid-skill). Rename tracked files with `git mv`: on case-insensitive file systems, Git doesn't notice a plain rename that only changes case.
 
 ### `agentfile/no-unnecessary-agent-files`
 
-Off by default. Since v2.1.277, Claude Code reads `AGENTS.md` when there is no `CLAUDE.md`, so one
-`AGENTS.md` can serve all agents. This rule reports a `CLAUDE.md` that only mirrors the
-`AGENTS.md` in its directory. That is the case when `CLAUDE.md`:
+Off by default. Since v2.1.277, Claude Code reads `AGENTS.md` when there is no `CLAUDE.md`, so one `AGENTS.md` can serve all agents. This rule reports a `CLAUDE.md` that only mirrors the `AGENTS.md` in its directory. That is the case when `CLAUDE.md`:
 
 - is a symlink to `AGENTS.md` (or the other way around, or both link to the same file),
 - has the same content (differences in BOM, line endings and trailing whitespace are ignored), or
 - only imports it (`@AGENTS.md`).
 
-Claude Code skips `AGENTS.md` while a `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md`
-exists in the directory where a session is launched or any parent directory. The rule checks
-that the suggested removals preserve instructions for sessions launched in the affected
-directories, including subdirectories that are not git-ignored. Apply related removals together. A
-`CLAUDE.md` outside the lint scope or excluded by configuration or suppression can still block the
-fallback. The rule never reports `CLAUDE.md` files in `.claude` directories, and it retains a
-`CLAUDE.md` that a symlink or an `@` import in any Markdown file of the project depends on.
+Claude Code skips `AGENTS.md` while a `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md` exists in the directory where a session is launched or any parent directory. The rule checks that the suggested removals preserve instructions for sessions launched in the affected directories, including subdirectories that are not git-ignored. Apply related removals together. A `CLAUDE.md` outside the lint scope or excluded by configuration or suppression can still block the fallback. The rule never reports `CLAUDE.md` files in `.claude` directories, and it retains a `CLAUDE.md` that a symlink or an `@` import in any Markdown file of the project depends on.
 
-The rule only looks inside the project (the Git repository), so it gives the same result on every
-machine. A `CLAUDE.md` in a directory above the repository, such as `~/Code/CLAUDE.md`, also
-keeps Claude Code from reading `AGENTS.md` in sessions launched below it.
+The rule only looks inside the project (the Git repository), so it gives the same result on every machine. A `CLAUDE.md` in a directory above the repository, such as `~/Code/CLAUDE.md`, also keeps Claude Code from reading `AGENTS.md` in sessions launched below it.
 
-Keep the `CLAUDE.md` if your team uses older Claude Code versions or sets "Project instructions"
-to `claude-md` in `/config`.
+Keep the `CLAUDE.md` if your team uses older Claude Code versions or sets "Project instructions"to `claude-md` in `/config`.
 
 ### `agentfile/keep-agents-file-up-to-date`
 
-Off by default. Reports context files that have not changed for more than
-`warnIfNotUpdatedForDays`. Agent instructions go stale as a project changes. Any change, even a
-small one, resets the timer: a commit in Git, otherwise any edit to the file.
+Off by default. Reports context files that have not changed for more than `warnIfNotUpdatedForDays`. Agent instructions go stale as a project changes. Any change, even a small one, resets the timer: a commit in Git, otherwise any edit to the file.
 
 ```jsonc
 "rules": {
@@ -428,24 +306,12 @@ small one, resets the timer: a commit in Git, otherwise any edit to the file.
 }
 ```
 
-- The date is the committer date of the last commit that changed the file on the current branch
-  (following first parents only, so a merge counts as the change). For a symlink, the target's
-  history is used.
-- Files without Git history (outside a Git repository, untracked, or when `git` is not
-  installed) are judged by their modification time. This also covers Mercurial, SVN and other
-  version control systems. Their checkouts write files with the checkout time, so a fresh
-  checkout never warns, but a long-lived one warns about files nobody has edited. Modification
-  times before 2023 are ignored: they come from tools that reset timestamps (the Nix store, npm
-  packages, zip archives), not from edits.
+- The date is the committer date of the last commit that changed the file on the current branch (following first parents only, so a merge counts as the change). For a symlink, the target's history is used.
+- Files without Git history (outside a Git repository, untracked, or when `git` is not installed) are judged by their modification time. This also covers Mercurial, SVN and other version control systems. Their checkouts write files with the checkout time, so a fresh checkout never warns, but a long-lived one warns about files nobody has edited. Modification times before 2023 are ignored: they come from tools that reset timestamps (the Nix store, npm packages, zip archives), not from edits.
 - Files with staged or unstaged changes are skipped, including newly staged files.
-- A file that differs from the committed version only in CRLF line endings counts as unchanged,
-  whatever `core.autocrlf` is set to, unless `.gitattributes` marks it `-text`. Working-tree
-  bytes are compared without running repository filters, so files transformed by a checkout
-  filter or custom encoding may also be skipped.
-- Git history checks use local objects. If history is unavailable in a partial clone, the file's
-  modification time is used.
-- In a shallow clone, every file looks freshly committed. In CI, check out the full history
-  (`actions/checkout` with `fetch-depth: 0`).
+- A file that differs from the committed version only in CRLF line endings counts as unchanged, whatever `core.autocrlf` is set to, unless `.gitattributes` marks it `-text`. Working-tree bytes are compared without running repository filters, so files transformed by a checkout filter or custom encoding may also be skipped.
+- Git history checks use local objects. If history is unavailable in a partial clone, the file's modification time is used.
+- In a shallow clone, every file looks freshly committed. In CI, check out the full history (`actions/checkout` with `fetch-depth: 0`).
 - Unlike the other rules, the result depends on the current date.
 
 | Option                            | Default | Description                                                                                   |
@@ -474,5 +340,4 @@ bun run schema      # regenerate configuration_schema.json after changing rule o
 bun run lint:self   # lint this repository's own AGENTS.md
 ```
 
-Imports outside the current directory use the `package.json` subpath imports `#src/*` and
-`#test/*`, e.g. `import { lint } from "#src/linter.ts"`.
+Imports outside the current directory use the `package.json` subpath imports `#src/*` and `#test/*`, e.g. `import { lint } from "#src/linter.ts"`.
