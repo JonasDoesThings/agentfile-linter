@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["eslint", "typescript", "unicorn", "oxc", "import", "node", "promise"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error",
+  },
+  "rules": {
+    // `x as T` is used deliberately to narrow indexed access under `noUncheckedIndexedAccess`
+    // (e.g. `tokens[i] as Token` after a bounds check); flagging every one adds noise, not safety.
+    "typescript/no-unsafe-type-assertion": "off",
+    // Opt-ins from outside the enabled categories.
+    "typescript/switch-exhaustiveness-check": "error",
+    "import/no-cycle": "error",
+  },
+  "ignorePatterns": ["dist/**"],
+}

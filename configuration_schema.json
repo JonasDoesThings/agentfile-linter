@@ -1,0 +1,1374 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "contextlint configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "description": "Gitignore-style patterns selecting the context files to lint. Defaults to AGENTS.md, AGENT.md, CLAUDE.md, CLAUDE.local.md and GEMINI.md in any directory."
+    },
+    "categories": {
+      "type": "object",
+      "description": "Severity for all rules in a category.",
+      "properties": {
+        "recommended": {
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": [
+                "off",
+                "warn",
+                "error",
+                "allow",
+                "deny"
+              ]
+            },
+            {
+              "type": "integer",
+              "enum": [
+                0,
+                1,
+                2
+              ]
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "rules": {
+      "type": "object",
+      "properties": {
+        "context/no-missing-path": {
+          "description": "Referenced files and directories (in code spans and @imports) must exist",
+          "oneOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "warn",
+                    "error",
+                    "allow",
+                    "deny"
+                  ]
+                },
+                {
+                  "type": "integer",
+                  "enum": [
+                    0,
+                    1,
+                    2
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "warn",
+                        "error",
+                        "allow",
+                        "deny"
+                      ]
+                    },
+                    {
+                      "type": "integer",
+                      "enum": [
+                        0,
+                        1,
+                        2
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "ignore": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Glob patterns of referenced paths to skip."
+                    },
+                    "allowSuffixMatch": {
+                      "type": "boolean",
+                      "description": "Accept a path if any project path ends with it (e.g. `components/Button.tsx` matches `apps/web/src/components/Button.tsx`)."
+                    },
+                    "checkImports": {
+                      "type": "boolean",
+                      "description": "Check `@path/to/file.md` imports used by CLAUDE.md and GEMINI.md."
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ],
+              "minItems": 1,
+              "maxItems": 2
+            }
+          ]
+        },
+        "no-missing-path": {
+          "description": "Referenced files and directories (in code spans and @imports) must exist",
+          "oneOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "warn",
+                    "error",
+                    "allow",
+                    "deny"
+                  ]
+                },
+                {
+                  "type": "integer",
+                  "enum": [
+                    0,
+                    1,
+                    2
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "warn",
+                        "error",
+                        "allow",
+                        "deny"
+                      ]
+                    },
+                    {
+                      "type": "integer",
+                      "enum": [
+                        0,
+                        1,
+                        2
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "ignore": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Glob patterns of referenced paths to skip."
+                    },
+                    "allowSuffixMatch": {
+                      "type": "boolean",
+                      "description": "Accept a path if any project path ends with it (e.g. `components/Button.tsx` matches `apps/web/src/components/Button.tsx`)."
+                    },
+                    "checkImports": {
+                      "type": "boolean",
+                      "description": "Check `@path/to/file.md` imports used by CLAUDE.md and GEMINI.md."
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ],
+              "minItems": 1,
+              "maxItems": 2
+            }
+          ]
+        },
+        "context/no-missing-script": {
+          "description": "Documented scripts and tasks (npm/pnpm/yarn/bun/deno, make, just, task, poetry/uv/pdm/hatch/tox/nox, maven, gradle, composer, cargo) must exist",
+          "oneOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "warn",
+                    "error",
+                    "allow",
+                    "deny"
+                  ]
+                },
+                {
+                  "type": "integer",
+                  "enum": [
+                    0,
+                    1,
+                    2
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "warn",
+                        "error",
+                        "allow",
+                        "deny"
+                      ]
+                    },
+                    {
+                      "type": "integer",
+                      "enum": [
+                        0,
+                        1,
+                        2
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "ignore": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Glob patterns of script, target or task names to skip."
+                    },
+                    "ignoreRunners": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "npm",
+                          "pnpm",
+                          "yarn",
+                          "bun",
+                          "deno",
+                          "make",
+                          "just",
+                          "task",
+                          "poetry",
+                          "uv",
+                          "pdm",
+                          "rye",
+                          "hatch",
+                          "pipenv",
+                          "poe",
+                          "tox",
+                          "nox",
+                          "maven",
+                          "gradle",
+                          "composer",
+                          "cargo"
+                        ]
+                      },
+                      "description": "Task runners whose commands are not checked."
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ],
+              "minItems": 1,
+              "maxItems": 2
+            }
+          ]
+        },
+        "no-missing-script": {
+          "description": "Documented scripts and tasks (npm/pnpm/yarn/bun/deno, make, just, task, poetry/uv/pdm/hatch/tox/nox, maven, gradle, composer, cargo) must exist",
+          "oneOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "warn",
+                    "error",
+                    "allow",
+                    "deny"
+                  ]
+                },
+                {
+                  "type": "integer",
+                  "enum": [
+                    0,
+                    1,
+                    2
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "warn",
+                        "error",
+                        "allow",
+                        "deny"
+                      ]
+                    },
+                    {
+                      "type": "integer",
+                      "enum": [
+                        0,
+                        1,
+                        2
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "ignore": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Glob patterns of script, target or task names to skip."
+                    },
+                    "ignoreRunners": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "npm",
+                          "pnpm",
+                          "yarn",
+                          "bun",
+                          "deno",
+                          "make",
+                          "just",
+                          "task",
+                          "poetry",
+                          "uv",
+                          "pdm",
+                          "rye",
+                          "hatch",
+                          "pipenv",
+                          "poe",
+                          "tox",
+                          "nox",
+                          "maven",
+                          "gradle",
+                          "composer",
+                          "cargo"
+                        ]
+                      },
+                      "description": "Task runners whose commands are not checked."
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ],
+              "minItems": 1,
+              "maxItems": 2
+            }
+          ]
+        },
+        "context/no-broken-reference": {
+          "description": "Relative Markdown links, images and local #anchors must resolve",
+          "oneOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "warn",
+                    "error",
+                    "allow",
+                    "deny"
+                  ]
+                },
+                {
+                  "type": "integer",
+                  "enum": [
+                    0,
+                    1,
+                    2
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "warn",
+                        "error",
+                        "allow",
+                        "deny"
+                      ]
+                    },
+                    {
+                      "type": "integer",
+                      "enum": [
+                        0,
+                        1,
+                        2
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "checkAnchors": {
+                      "type": "boolean",
+                      "description": "Check `#fragment` anchors against document headings."
+                    },
+                    "ignore": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Glob patterns of link targets to skip."
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ],
+              "minItems": 1,
+              "maxItems": 2
+            }
+          ]
+        },
+        "no-broken-reference": {
+          "description": "Relative Markdown links, images and local #anchors must resolve",
+          "oneOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "warn",
+                    "error",
+                    "allow",
+                    "deny"
+                  ]
+                },
+                {
+                  "type": "integer",
+                  "enum": [
+                    0,
+                    1,
+                    2
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "warn",
+                        "error",
+                        "allow",
+                        "deny"
+                      ]
+                    },
+                    {
+                      "type": "integer",
+                      "enum": [
+                        0,
+                        1,
+                        2
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "checkAnchors": {
+                      "type": "boolean",
+                      "description": "Check `#fragment` anchors against document headings."
+                    },
+                    "ignore": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Glob patterns of link targets to skip."
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ],
+              "minItems": 1,
+              "maxItems": 2
+            }
+          ]
+        },
+        "context/no-agent-files-drift": {
+          "description": "AGENTS.md, CLAUDE.md, GEMINI.md, ... in the same directory must be identical or symlinked",
+          "oneOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "warn",
+                    "error",
+                    "allow",
+                    "deny"
+                  ]
+                },
+                {
+                  "type": "integer",
+                  "enum": [
+                    0,
+                    1,
+                    2
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "warn",
+                        "error",
+                        "allow",
+                        "deny"
+                      ]
+                    },
+                    {
+                      "type": "integer",
+                      "enum": [
+                        0,
+                        1,
+                        2
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "files": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "File names that must stay in sync, in order of precedence (the first existing one is canonical)."
+                    },
+                    "allowImports": {
+                      "type": "boolean",
+                      "description": "Treat a file that only contains `@AGENTS.md`-style imports of a sibling as in sync."
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ],
+              "minItems": 1,
+              "maxItems": 2
+            }
+          ]
+        },
+        "no-agent-files-drift": {
+          "description": "AGENTS.md, CLAUDE.md, GEMINI.md, ... in the same directory must be identical or symlinked",
+          "oneOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "warn",
+                    "error",
+                    "allow",
+                    "deny"
+                  ]
+                },
+                {
+                  "type": "integer",
+                  "enum": [
+                    0,
+                    1,
+                    2
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "warn",
+                        "error",
+                        "allow",
+                        "deny"
+                      ]
+                    },
+                    {
+                      "type": "integer",
+                      "enum": [
+                        0,
+                        1,
+                        2
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "files": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "File names that must stay in sync, in order of precedence (the first existing one is canonical)."
+                    },
+                    "allowImports": {
+                      "type": "boolean",
+                      "description": "Treat a file that only contains `@AGENTS.md`-style imports of a sibling as in sync."
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ],
+              "minItems": 1,
+              "maxItems": 2
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "overrides": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "files"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "rules": {
+            "type": "object",
+            "properties": {
+              "context/no-missing-path": {
+                "description": "Referenced files and directories (in code spans and @imports) must exist",
+                "oneOf": [
+                  {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "warn",
+                          "error",
+                          "allow",
+                          "deny"
+                        ]
+                      },
+                      {
+                        "type": "integer",
+                        "enum": [
+                          0,
+                          1,
+                          2
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "prefixItems": [
+                      {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "off",
+                              "warn",
+                              "error",
+                              "allow",
+                              "deny"
+                            ]
+                          },
+                          {
+                            "type": "integer",
+                            "enum": [
+                              0,
+                              1,
+                              2
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "ignore": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Glob patterns of referenced paths to skip."
+                          },
+                          "allowSuffixMatch": {
+                            "type": "boolean",
+                            "description": "Accept a path if any project path ends with it (e.g. `components/Button.tsx` matches `apps/web/src/components/Button.tsx`)."
+                          },
+                          "checkImports": {
+                            "type": "boolean",
+                            "description": "Check `@path/to/file.md` imports used by CLAUDE.md and GEMINI.md."
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    ],
+                    "minItems": 1,
+                    "maxItems": 2
+                  }
+                ]
+              },
+              "no-missing-path": {
+                "description": "Referenced files and directories (in code spans and @imports) must exist",
+                "oneOf": [
+                  {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "warn",
+                          "error",
+                          "allow",
+                          "deny"
+                        ]
+                      },
+                      {
+                        "type": "integer",
+                        "enum": [
+                          0,
+                          1,
+                          2
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "prefixItems": [
+                      {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "off",
+                              "warn",
+                              "error",
+                              "allow",
+                              "deny"
+                            ]
+                          },
+                          {
+                            "type": "integer",
+                            "enum": [
+                              0,
+                              1,
+                              2
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "ignore": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Glob patterns of referenced paths to skip."
+                          },
+                          "allowSuffixMatch": {
+                            "type": "boolean",
+                            "description": "Accept a path if any project path ends with it (e.g. `components/Button.tsx` matches `apps/web/src/components/Button.tsx`)."
+                          },
+                          "checkImports": {
+                            "type": "boolean",
+                            "description": "Check `@path/to/file.md` imports used by CLAUDE.md and GEMINI.md."
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    ],
+                    "minItems": 1,
+                    "maxItems": 2
+                  }
+                ]
+              },
+              "context/no-missing-script": {
+                "description": "Documented scripts and tasks (npm/pnpm/yarn/bun/deno, make, just, task, poetry/uv/pdm/hatch/tox/nox, maven, gradle, composer, cargo) must exist",
+                "oneOf": [
+                  {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "warn",
+                          "error",
+                          "allow",
+                          "deny"
+                        ]
+                      },
+                      {
+                        "type": "integer",
+                        "enum": [
+                          0,
+                          1,
+                          2
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "prefixItems": [
+                      {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "off",
+                              "warn",
+                              "error",
+                              "allow",
+                              "deny"
+                            ]
+                          },
+                          {
+                            "type": "integer",
+                            "enum": [
+                              0,
+                              1,
+                              2
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "ignore": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Glob patterns of script, target or task names to skip."
+                          },
+                          "ignoreRunners": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "npm",
+                                "pnpm",
+                                "yarn",
+                                "bun",
+                                "deno",
+                                "make",
+                                "just",
+                                "task",
+                                "poetry",
+                                "uv",
+                                "pdm",
+                                "rye",
+                                "hatch",
+                                "pipenv",
+                                "poe",
+                                "tox",
+                                "nox",
+                                "maven",
+                                "gradle",
+                                "composer",
+                                "cargo"
+                              ]
+                            },
+                            "description": "Task runners whose commands are not checked."
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    ],
+                    "minItems": 1,
+                    "maxItems": 2
+                  }
+                ]
+              },
+              "no-missing-script": {
+                "description": "Documented scripts and tasks (npm/pnpm/yarn/bun/deno, make, just, task, poetry/uv/pdm/hatch/tox/nox, maven, gradle, composer, cargo) must exist",
+                "oneOf": [
+                  {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "warn",
+                          "error",
+                          "allow",
+                          "deny"
+                        ]
+                      },
+                      {
+                        "type": "integer",
+                        "enum": [
+                          0,
+                          1,
+                          2
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "prefixItems": [
+                      {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "off",
+                              "warn",
+                              "error",
+                              "allow",
+                              "deny"
+                            ]
+                          },
+                          {
+                            "type": "integer",
+                            "enum": [
+                              0,
+                              1,
+                              2
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "ignore": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Glob patterns of script, target or task names to skip."
+                          },
+                          "ignoreRunners": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "npm",
+                                "pnpm",
+                                "yarn",
+                                "bun",
+                                "deno",
+                                "make",
+                                "just",
+                                "task",
+                                "poetry",
+                                "uv",
+                                "pdm",
+                                "rye",
+                                "hatch",
+                                "pipenv",
+                                "poe",
+                                "tox",
+                                "nox",
+                                "maven",
+                                "gradle",
+                                "composer",
+                                "cargo"
+                              ]
+                            },
+                            "description": "Task runners whose commands are not checked."
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    ],
+                    "minItems": 1,
+                    "maxItems": 2
+                  }
+                ]
+              },
+              "context/no-broken-reference": {
+                "description": "Relative Markdown links, images and local #anchors must resolve",
+                "oneOf": [
+                  {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "warn",
+                          "error",
+                          "allow",
+                          "deny"
+                        ]
+                      },
+                      {
+                        "type": "integer",
+                        "enum": [
+                          0,
+                          1,
+                          2
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "prefixItems": [
+                      {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "off",
+                              "warn",
+                              "error",
+                              "allow",
+                              "deny"
+                            ]
+                          },
+                          {
+                            "type": "integer",
+                            "enum": [
+                              0,
+                              1,
+                              2
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "checkAnchors": {
+                            "type": "boolean",
+                            "description": "Check `#fragment` anchors against document headings."
+                          },
+                          "ignore": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Glob patterns of link targets to skip."
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    ],
+                    "minItems": 1,
+                    "maxItems": 2
+                  }
+                ]
+              },
+              "no-broken-reference": {
+                "description": "Relative Markdown links, images and local #anchors must resolve",
+                "oneOf": [
+                  {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "warn",
+                          "error",
+                          "allow",
+                          "deny"
+                        ]
+                      },
+                      {
+                        "type": "integer",
+                        "enum": [
+                          0,
+                          1,
+                          2
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "prefixItems": [
+                      {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "off",
+                              "warn",
+                              "error",
+                              "allow",
+                              "deny"
+                            ]
+                          },
+                          {
+                            "type": "integer",
+                            "enum": [
+                              0,
+                              1,
+                              2
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "checkAnchors": {
+                            "type": "boolean",
+                            "description": "Check `#fragment` anchors against document headings."
+                          },
+                          "ignore": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Glob patterns of link targets to skip."
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    ],
+                    "minItems": 1,
+                    "maxItems": 2
+                  }
+                ]
+              },
+              "context/no-agent-files-drift": {
+                "description": "AGENTS.md, CLAUDE.md, GEMINI.md, ... in the same directory must be identical or symlinked",
+                "oneOf": [
+                  {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "warn",
+                          "error",
+                          "allow",
+                          "deny"
+                        ]
+                      },
+                      {
+                        "type": "integer",
+                        "enum": [
+                          0,
+                          1,
+                          2
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "prefixItems": [
+                      {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "off",
+                              "warn",
+                              "error",
+                              "allow",
+                              "deny"
+                            ]
+                          },
+                          {
+                            "type": "integer",
+                            "enum": [
+                              0,
+                              1,
+                              2
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "files": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "File names that must stay in sync, in order of precedence (the first existing one is canonical)."
+                          },
+                          "allowImports": {
+                            "type": "boolean",
+                            "description": "Treat a file that only contains `@AGENTS.md`-style imports of a sibling as in sync."
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    ],
+                    "minItems": 1,
+                    "maxItems": 2
+                  }
+                ]
+              },
+              "no-agent-files-drift": {
+                "description": "AGENTS.md, CLAUDE.md, GEMINI.md, ... in the same directory must be identical or symlinked",
+                "oneOf": [
+                  {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "warn",
+                          "error",
+                          "allow",
+                          "deny"
+                        ]
+                      },
+                      {
+                        "type": "integer",
+                        "enum": [
+                          0,
+                          1,
+                          2
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "prefixItems": [
+                      {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "off",
+                              "warn",
+                              "error",
+                              "allow",
+                              "deny"
+                            ]
+                          },
+                          {
+                            "type": "integer",
+                            "enum": [
+                              0,
+                              1,
+                              2
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "files": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "File names that must stay in sync, in order of precedence (the first existing one is canonical)."
+                          },
+                          "allowImports": {
+                            "type": "boolean",
+                            "description": "Treat a file that only contains `@AGENTS.md`-style imports of a sibling as in sync."
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    ],
+                    "minItems": 1,
+                    "maxItems": 2
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    "ignorePatterns": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Gitignore-style patterns of files that are not linted."
+    }
+  }
+}
