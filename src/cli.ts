@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 import { existsSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 

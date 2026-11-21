@@ -1,6 +1,7 @@
 import { basename, dirname, join } from "node:path";
 
 import { extractFrontmatter, isFrontmatterDelimiter, parseFrontmatter } from "#src/frontmatter.ts";
+import { Glob } from "#src/glob.ts";
 import { ALWAYS_SKIPPED_DIRS, isWithin, type Project, tryRealpath } from "#src/project.ts";
 import { closest, lineRange, splitLines } from "#src/text.ts";
 import type { Position, ReportDescriptor, Rule, TreeDiscoveryContext, TreeInput } from "#src/types.ts";
@@ -168,7 +169,7 @@ type SkillInput = TreeInput & ({ problem: LayoutProblem } | { options: NoInvalid
 type SkillReporter = (descriptor: Omit<ReportDescriptor, "start"> & { start?: Position }) => void;
 
 class SkillDiscovery {
-  private readonly globs = new Map<string, Bun.Glob>();
+  private readonly globs = new Map<string, Glob>();
   private readonly explicitFiles: Set<string>;
   private readonly explicitFileAncestors = new Set<string>();
   private readonly inputs = new Map<string, SkillInput>();
@@ -257,7 +258,7 @@ class SkillDiscovery {
     return patterns.some((pattern) => {
       let glob = this.globs.get(pattern);
       if (!glob) {
-        glob = new Bun.Glob(pattern.replace(/^\.?\//, "").replace(/\/$/, ""));
+        glob = new Glob(pattern.replace(/^\.?\//, "").replace(/\/$/, ""));
         this.globs.set(pattern, glob);
       }
       return glob.match(rel);

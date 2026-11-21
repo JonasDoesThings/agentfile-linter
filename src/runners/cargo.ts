@@ -1,6 +1,7 @@
 import { dirname, join, relative, resolve } from "node:path";
 
 import { toPosix } from "#src/gitignore.ts";
+import { Glob } from "#src/glob.ts";
 import type { Project } from "#src/project.ts";
 import { asRecord as rec } from "#src/util.ts";
 
@@ -76,7 +77,7 @@ function cargoWorkspace(project: Project, manifest: string): CargoWorkspace {
     const ws = rec(data.workspace);
     const members = Array.isArray(ws.members) ? ws.members.filter((m): m is string => typeof m === "string") : [];
     const exclude = Array.isArray(ws.exclude) ? ws.exclude.filter((m): m is string => typeof m === "string") : [];
-    const globs = members.map((m) => new Bun.Glob(m.replace(/\/+$/, "")));
+    const globs = members.map((m) => new Glob(m.replace(/\/+$/, "")));
     const excluded = exclude.map((m) => resolve(root, m));
     for (const file of project.findFilesNamed(["Cargo.toml"])) {
       const rel = toPosix(relative(root, dirname(file)));
@@ -157,7 +158,7 @@ export const cargoRunner: TaskRunner = {
     for (const spec of packages) {
       const name = spec.value.replace(/[@:].*$/, "");
       const matches = /[*?[]/.test(name)
-        ? ws.crates.filter((c) => new Bun.Glob(name).match(c.name))
+        ? ws.crates.filter((c) => new Glob(name).match(c.name))
         : ws.crates.filter((c) => c.name === name);
       if (matches.length) selected.push(...matches);
       else

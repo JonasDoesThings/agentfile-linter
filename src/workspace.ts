@@ -1,6 +1,9 @@
 import { dirname, join, relative, resolve } from "node:path";
 
+import { parse as parseYaml } from "yaml";
+
 import { toPosix } from "./gitignore.ts";
+import { Glob } from "./glob.ts";
 import type { Project } from "./project.ts";
 import { isRecord } from "./util.ts";
 
@@ -134,7 +137,7 @@ export class Workspaces {
       const text = this.project.readText(join(dir, "pnpm-workspace.yaml"));
       if (text === null) return null;
       try {
-        const raw: unknown = Bun.YAML.parse(text);
+        const raw: unknown = parseYaml(text, { logLevel: "silent" });
         return isRecord(raw) ? raw : {};
       } catch {
         return {};
@@ -170,8 +173,8 @@ export class Workspaces {
     const cached = this.membersCache.get(key);
     if (cached) return cached;
     const patterns = this.patternsAt(root, manifestOnly) ?? [];
-    const include = patterns.filter((p) => !p.startsWith("!")).map((p) => new Bun.Glob(normalizePattern(p)));
-    const exclude = patterns.filter((p) => p.startsWith("!")).map((p) => new Bun.Glob(normalizePattern(p.slice(1))));
+    const include = patterns.filter((p) => !p.startsWith("!")).map((p) => new Glob(normalizePattern(p)));
+    const exclude = patterns.filter((p) => p.startsWith("!")).map((p) => new Glob(normalizePattern(p.slice(1))));
     const members: PackageInfo[] = [];
     for (const pkg of this.allPackages()) {
       if (pkg.dir === root) continue;
@@ -215,14 +218,14 @@ export class Workspaces {
       const base = braced ? wsRoot : cwd;
       const abs = resolve(base, pathPattern);
       if (/[*?]/.test(pathPattern)) {
-        const glob = new Bun.Glob(normalizePattern(toPosix(relative(base, abs))));
+        const glob = new Glob(normalizePattern(toPosix(relative(base, abs))));
         return candidates.filter((p) => glob.match(toPosix(relative(base, p.dir))));
       }
       return candidates.filter((p) => p.dir === abs || p.dir.startsWith(`${abs}/`));
     }
 
     if (/[*?]/.test(sel)) {
-      const glob = new Bun.Glob(sel);
+      const glob = new Glob(sel);
       return candidates.filter((p) => p.name !== undefined && glob.match(p.name));
     }
 

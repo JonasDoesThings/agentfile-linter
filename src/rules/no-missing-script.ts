@@ -2,6 +2,7 @@ import { dirname } from "node:path";
 
 import type { Code, InlineCode } from "mdast";
 
+import { Glob } from "#src/glob.ts";
 import { computeLineStarts, offsetToPosition, visit } from "#src/markdown.ts";
 import { checkCommand, RUNNER_IDS } from "#src/runners/index.ts";
 import {
@@ -104,7 +105,7 @@ export const noMissingScript: Rule<NoMissingScriptOptions> = {
   defaultOptions: { ignore: [], ignoreRunners: [] },
   check({ file, project, options, report }) {
     const fileDir = dirname(file.path);
-    const ignoreGlobs = options.ignore.map((p) => new Bun.Glob(p));
+    const ignoreGlobs = options.ignore.map((p) => new Glob(p));
     const ignoredRunners = new Set(options.ignoreRunners);
 
     visit(file.ast, ["inlineCode", "code"], (node) => {

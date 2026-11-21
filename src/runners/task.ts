@@ -1,5 +1,7 @@
 import { dirname, resolve } from "node:path";
 
+import { parse as parseYaml } from "yaml";
+
 import type { Project } from "#src/project.ts";
 import type { Token } from "#src/shell.ts";
 import { asRecord } from "#src/util.ts";
@@ -31,7 +33,7 @@ export function parseTaskfile(project: Project, file: string, seen = new Set<str
   if (seen.has(file)) return result;
   let doc: Record<string, unknown>;
   try {
-    doc = asRecord(Bun.YAML.parse(project.readText(file) ?? ""));
+    doc = asRecord(parseYaml(project.readText(file) ?? "", { logLevel: "silent" }));
   } catch {
     result.dynamic = true;
     return result;

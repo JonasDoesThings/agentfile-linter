@@ -1,5 +1,7 @@
 import { dirname, join } from "node:path";
 
+import { parse as parseToml } from "smol-toml";
+
 import type { Project } from "#src/project.ts";
 import { sliceToken, type Token } from "#src/shell.ts";
 import { asRecord as rec, asStrings as strings } from "#src/util.ts";
@@ -21,7 +23,7 @@ export function readToml(project: Project, file: string): Rec | null {
     const text = project.readText(file);
     if (text === null) return null;
     try {
-      return rec(Bun.TOML.parse(text));
+      return rec(parseToml(text));
     } catch {
       return null;
     }

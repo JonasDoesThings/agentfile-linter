@@ -21,7 +21,21 @@ Finished in 14ms on 3 files with 4 rules.
 
 ## Installation
 
-agentfile-linter is built with [Bun](https://bun.sh) and ships as a single standalone executable.
+Run the CLI from npm with Node.js 22.17 or newer.
+
+```sh
+pnpx agentfile-linter
+npx agentfile-linter
+```
+
+To pin the CLI in a project or run it from a package script, install it as a dev dependency.
+
+```sh
+npm install --save-dev agentfile-linter
+npm exec -- agentfile-linter
+```
+
+You can also build a standalone executable from source with [Bun](https://bun.sh).
 
 ```sh
 bun install

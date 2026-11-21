@@ -2,6 +2,8 @@ import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, type St
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { GitIgnoreTree, toPosix } from "./gitignore.ts";
+import { Glob } from "./glob.ts";
+import { parseJsonc } from "./jsonc.ts";
 import { collectAnchors, parseMarkdown } from "./markdown.ts";
 import { Workspaces } from "./workspace.ts";
 
@@ -104,7 +106,7 @@ export class Project {
     const text = this.readText(absPath);
     if (text === null) return null;
     try {
-      return Bun.JSONC.parse(text);
+      return parseJsonc(text);
     } catch {
       return null;
     }
@@ -207,7 +209,7 @@ export class Project {
     const directoryPrefix = /^(?:\.{1,2}\/)+/.exec(pattern)?.[0] ?? "";
     const searchDir = resolve(baseDir, directoryPrefix);
     if (!this.contains(searchDir)) return false;
-    const glob = new Bun.Glob(pattern.slice(directoryPrefix.length));
+    const glob = new Glob(pattern.slice(directoryPrefix.length));
     const baseRel = this.relative(searchDir);
     const prefix = baseRel ? `${baseRel}/` : "";
     const matches = (path: string) => path.startsWith(prefix) && glob.match(path.slice(prefix.length));

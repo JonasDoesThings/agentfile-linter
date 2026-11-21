@@ -1,3 +1,4 @@
+import { globSync } from "node:fs";
 import { dirname, extname, resolve } from "node:path";
 
 import type { Project } from "#src/project.ts";
@@ -57,7 +58,9 @@ export function parseMakefile(
           continue;
         }
         const matches = /[*?[]/.test(pattern)
-          ? [...new Bun.Glob(pattern).scanSync({ cwd, onlyFiles: true })].map((m) => resolve(cwd, m))
+          ? globSync(pattern, { cwd })
+              .map((m) => resolve(cwd, m))
+              .filter((path) => project.isFile(path))
           : [resolve(cwd, pattern)];
         for (const match of matches) {
           const nested = parseMakefile(project, match, cwd, seen);

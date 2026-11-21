@@ -3,8 +3,12 @@
   "version": "0.0.1",
   "description": "Linter for AI agent context files (AGENTS.md, CLAUDE.md, GEMINI.md, ...)",
   "bin": {
-    "agentfile-linter": "./src/cli.ts"
+    "agentfile-linter": "dist/cli.js"
   },
+  "files": [
+    "dist/cli.js",
+    "configuration_schema.json"
+  ],
   "type": "module",
   "imports": {
     "#src/*": "./src/*",
@@ -15,6 +19,8 @@
     "dev": "bun run src/cli.ts",
     "build": "bun run scripts/build.ts",
     "build:all": "bun run scripts/build.ts --all",
+    "build:npm": "bun run scripts/build-npm.ts",
+    "prepack": "bun run build:npm",
     "schema": "bun run scripts/generate-schema.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
@@ -28,12 +34,15 @@
   "dependencies": {
     "github-slugger": "^2.0.0",
     "ignore": "^7.0.16",
+    "jsonc-parser": "^3.3.1",
     "mdast-util-from-markdown": "^2.1.0",
     "mdast-util-frontmatter": "^2.0.1",
     "mdast-util-gfm": "^3.1.0",
     "mdast-util-to-string": "^4.0.0",
     "micromark-extension-frontmatter": "^2.0.0",
     "micromark-extension-gfm": "^3.0.0",
+    "minimatch": "^11.0.9",
+    "smol-toml": "^1.9.1",
     "yaml": "^2.9.1"
   },
   "devDependencies": {
@@ -43,5 +52,8 @@
     "oxlint": "^1.94.0",
     "oxlint-tsgolint": "^7.0.2008",
     "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=22.17.0"
   }
 }

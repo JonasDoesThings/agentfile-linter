@@ -18,6 +18,7 @@ modeled on oxlint. See [README.md](README.md) for user-facing behavior.
 - `bun run check` runs formatting check, lint, typecheck, tests and self-lint. Run it before
   finishing a change.
 - `bun run build` builds `dist/agentfile-linter`. `bun run build:all` cross-compiles for every target.
+- `bun run build:npm` builds the Node.js CLI at `dist/cli.js`. npm runs it before packing.
 - `bun run schema` regenerates `configuration_schema.json`. A test fails if the file is stale.
 - `bun run lint:self` lints this repository with itself.
 

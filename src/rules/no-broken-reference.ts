@@ -2,6 +2,7 @@ import { dirname, extname, join, relative } from "node:path";
 
 import type { Nodes } from "mdast";
 
+import { Glob } from "#src/glob.ts";
 import { collectAnchors, locateInNode, visit } from "#src/markdown.ts";
 import { countLines, normalizeAnchor, normalizeAnchors } from "#src/project.ts";
 import type { Position, Rule } from "#src/types.ts";
@@ -63,7 +64,7 @@ export const noBrokenReference: Rule<NoBrokenReferenceOptions> = {
   defaultOptions: { checkAnchors: true, checkLines: true, ignore: [] },
   check({ file, project, options, report }) {
     const fileDir = dirname(file.path);
-    const ignoreGlobs = options.ignore.map((p) => new Bun.Glob(p));
+    const ignoreGlobs = options.ignore.map((p) => new Glob(p));
     let ownAnchors: Set<string> | undefined;
 
     const checkLineRange = (

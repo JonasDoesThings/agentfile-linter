@@ -4,6 +4,8 @@ import { dirname, join, relative, resolve } from "node:path";
 import { RULES, resolveRuleName, rulesInCategory, suggestRuleName } from "#src/rules/index.ts";
 
 import { toPosix } from "./gitignore.ts";
+import { Glob } from "./glob.ts";
+import { parseJsonc } from "./jsonc.ts";
 import { validate } from "./schema.ts";
 import { type AnyRule, CATEGORIES, type Category, DEFAULT_FILE_PATTERNS, type Severity } from "./types.ts";
 import { isRecord } from "./util.ts";
@@ -171,7 +173,7 @@ export function loadConfigFile(path: string): Config {
   }
   let raw: unknown;
   try {
-    raw = Bun.JSONC.parse(text);
+    raw = parseJsonc(text);
   } catch (error) {
     throw new ConfigError(`Failed to parse ${path}: ${(error as Error).message}`);
   }
@@ -199,11 +201,11 @@ export function findConfigFile(startDir: string): string | null {
 export function matchesFilePattern(pattern: string, base: string, absPath: string): boolean {
   const normalized = pattern.replace(/^\.\//, "");
   if (!normalized.includes("/")) {
-    return new Bun.Glob(normalized).match(absPath.split(/[\\/]/).at(-1) as string);
+    return new Glob(normalized).match(absPath.split(/[\\/]/).at(-1) as string);
   }
   const rel = toPosix(relative(base, absPath));
   if (rel.startsWith("..")) return false;
-  return new Bun.Glob(normalized.replace(/^\//, "")).match(rel);
+  return new Glob(normalized.replace(/^\//, "")).match(rel);
 }
 
 /** A rule-severity flag from the command line (`-A`, `-W`, `-D`). */

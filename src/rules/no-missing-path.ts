@@ -3,6 +3,7 @@ import { basename, dirname, join } from "node:path";
 import type { InlineCode, Nodes, Parents, Root } from "mdast";
 import { toString } from "mdast-util-to-string";
 
+import { Glob } from "#src/glob.ts";
 import { locateInNode, visit } from "#src/markdown.ts";
 import type { Project } from "#src/project.ts";
 import type { Rule } from "#src/types.ts";
@@ -325,7 +326,7 @@ export const noMissingPath: Rule<NoMissingPathOptions> = {
   defaultOptions: { ignore: [], allowSuffixMatch: true, checkImports: true },
   check({ file, project, options, report }) {
     const fileDir = dirname(file.path);
-    const ignoreGlobs = options.ignore.map((p) => new Bun.Glob(p));
+    const ignoreGlobs = options.ignore.map((p) => new Glob(p));
     const isIgnoredByOption = (p: string) => ignoreGlobs.some((g) => g.match(p));
     let exampleFiles: Set<string> | undefined;
 

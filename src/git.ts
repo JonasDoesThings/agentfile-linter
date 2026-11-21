@@ -1,5 +1,10 @@
+import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { basename, dirname } from "node:path";
+import { promisify } from "node:util";
+
+const exec = promisify(execFile);
 
 /** Maximum number of git processes running at the same time. */
 const MAX_PARALLEL = 8;
@@ -43,20 +48,20 @@ function gitEnv(): Record<string, string | undefined> {
 /** Runs git in `cwd`. Returns stdout, or null when git fails or is not installed. */
 function git(cwd: string, args: string[]): Promise<string | null> {
   return withSlot(async () => {
-    let proc: Bun.Subprocess<"ignore", "pipe", "ignore">;
     try {
-      proc = Bun.spawn(["git", "--literal-pathspecs", "--no-optional-locks", "-c", "core.fsmonitor=false", ...args], {
-        cwd,
-        env: gitEnv(),
-        stdin: "ignore",
-        stdout: "pipe",
-        stderr: "ignore",
-      });
+      const { stdout } = await exec(
+        "git",
+        ["--literal-pathspecs", "--no-optional-locks", "-c", "core.fsmonitor=false", ...args],
+        {
+          cwd,
+          env: gitEnv(),
+          windowsHide: true,
+        },
+      );
+      return stdout;
     } catch {
-      return null; // git is not installed, or `cwd` doesn't exist
+      return null;
     }
-    const [stdout, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
-    return code === 0 ? stdout : null;
   });
 }
 
@@ -109,7 +114,7 @@ export async function readIndex(path: string): Promise<IndexState> {
 
 function blobOid(bytes: Buffer, indexOid: string): string {
   const algorithm = indexOid.length === 64 ? "sha256" : "sha1";
-  return new Bun.CryptoHasher(algorithm).update(`blob ${bytes.length}\0`).update(bytes).digest("hex");
+  return createHash(algorithm).update(`blob ${bytes.length}\0`).update(bytes).digest("hex");
 }
 
 /** Caches values for one lint run, such as `Project.memo`. */
