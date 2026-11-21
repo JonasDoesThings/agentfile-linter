@@ -3,62 +3,125 @@ import { dirname, extname, join, relative } from "node:path";
 import type { Nodes } from "mdast";
 
 import { collectAnchors, locateInNode, visit } from "#src/markdown.ts";
-import { normalizeAnchor, normalizeAnchors } from "#src/project.ts";
-import type { Rule } from "#src/types.ts";
+import { countLines, normalizeAnchor, normalizeAnchors } from "#src/project.ts";
+import type { Position, Rule } from "#src/types.ts";
 
 export interface NoBrokenReferenceOptions {
   /** Check `#fragment` anchors against headings. */
   checkAnchors: boolean;
+  /** Check `#L42` / `#L42-L50` line fragments against the length of the target file. */
+  checkLines: boolean;
   /** Glob patterns of link targets that are never reported. */
   ignore: string[];
 }
 
 const MARKDOWN_EXTENSIONS = new Set([".md", ".mdx", ".markdown", ".mdc"]);
 const HTML_ATTR_RE = /\s(?:href|src)\s*=\s*["']([^"']+)["']/gi;
+/** `?plain=1` shows a Markdown file's source with numbered lines on GitHub. */
+const PLAIN_QUERY_RE = /[?&]plain=1(?:&|$)/;
+/** Line fragments as GitHub, GitLab and Gitea write them: `L42`, `L42-L50`, `L42-50`, `L42C5-L50C10`. */
+const LINE_FRAGMENT_RE = /^L(\d+)(?:C\d+)?(?:-L?(\d+)(?:C\d+)?)?$/;
+
+interface LineRange {
+  start: number;
+  end: number;
+}
 
 function isExternal(url: string): boolean {
   return /^[a-z][a-z0-9+.-]*:/i.test(url) || url.startsWith("//");
 }
 
+function isMarkdownPath(path: string): boolean {
+  return MARKDOWN_EXTENSIONS.has(extname(path).toLowerCase());
+}
+
+function parseLineFragment(fragment: string): LineRange | null {
+  const match = LINE_FRAGMENT_RE.exec(fragment);
+  if (!match) return null;
+  const start = Number(match[1]);
+  return { start, end: match[2] === undefined ? start : Number(match[2]) };
+}
+
 export const noBrokenReference: Rule<NoBrokenReferenceOptions> = {
   meta: {
     name: "context/no-broken-reference",
-    description: "Relative Markdown links, images and local #anchors must resolve",
+    description: "Relative Markdown links, images, local #anchors and #L42 line fragments must resolve",
     categories: ["recommended"],
     defaultSeverity: "error",
     schema: {
       type: "object",
       properties: {
         checkAnchors: { type: "boolean", description: "Check `#fragment` anchors against document headings." },
+        checkLines: {
+          type: "boolean",
+          description: "Check `#L42` / `#L42-L50` line fragments against the length of the target file.",
+        },
         ignore: { type: "array", items: { type: "string" }, description: "Glob patterns of link targets to skip." },
       },
     },
   },
-  defaultOptions: { checkAnchors: true, ignore: [] },
+  defaultOptions: { checkAnchors: true, checkLines: true, ignore: [] },
   check({ file, project, options, report }) {
     const fileDir = dirname(file.path);
     const ignoreGlobs = options.ignore.map((p) => new Bun.Glob(p));
     let ownAnchors: Set<string> | undefined;
+
+    const checkLineRange = (
+      fragment: string,
+      range: LineRange,
+      lineCount: number | null,
+      where: string,
+      loc: () => { start: Position; end?: Position },
+    ) => {
+      if (lineCount === null) return;
+      const label = range.start === range.end ? "Line" : "Line range";
+      if (range.start === 0) {
+        report({ message: `${label} \`#${fragment}\` is invalid: line numbers start at 1`, ...loc() });
+      } else if (range.end < range.start) {
+        report({
+          message: `Line range \`#${fragment}\` ends before it starts`,
+          help: "Put the lower line number first.",
+          ...loc(),
+        });
+      } else if (range.end > lineCount) {
+        report({
+          message: `${label} \`#${fragment}\` is out of range: ${where} has ${lineCount} line${lineCount === 1 ? "" : "s"}`,
+          help: "The file has probably changed since the link was written. Update the line numbers.",
+          ...loc(),
+        });
+      }
+    };
 
     const checkUrl = (url: string, node: Nodes) => {
       const target = url.trim();
       if (!target || isExternal(target)) return;
       if (ignoreGlobs.some((g) => g.match(target))) return;
       const hashIndex = target.indexOf("#");
-      const pathPart = (hashIndex === -1 ? target : target.slice(0, hashIndex)).replace(/\?.*$/, "");
+      const beforeHash = hashIndex === -1 ? target : target.slice(0, hashIndex);
+      const queryIndex = beforeHash.indexOf("?");
+      const pathPart = queryIndex === -1 ? beforeHash : beforeHash.slice(0, queryIndex);
+      const plainView = queryIndex !== -1 && PLAIN_QUERY_RE.test(beforeHash.slice(queryIndex));
       const fragment = hashIndex === -1 ? null : target.slice(hashIndex + 1);
+      const lineRange = fragment === null ? null : parseLineFragment(fragment);
       const loc = () => locateInNode(file.text, file.lineStarts, node, url);
+      // GitHub renders Markdown, where `#L42` is a heading anchor. Lines are numbered only in
+      // other files and in the source view of Markdown (`?plain=1`).
+      const usesLines = (path: string) => lineRange !== null && (plainView || !isMarkdownPath(path));
 
       if (!pathPart) {
-        if (!fragment || !options.checkAnchors || fragment.toLowerCase() === "top") return;
-        ownAnchors ??= normalizeAnchors(collectAnchors(file.ast));
-        if (!ownAnchors.has(normalizeAnchor(fragment))) {
-          report({
-            message: `Anchor \`#${fragment}\` does not match any heading in this file`,
-            help: "Anchors use GitHub-style heading slugs (lowercase, spaces replaced by `-`).",
-            ...loc(),
-          });
+        if (!fragment || fragment.toLowerCase() === "top") return;
+        if (lineRange && usesLines(file.path)) {
+          if (options.checkLines) checkLineRange(fragment, lineRange, countLines(file.text), "this file", loc);
+          return;
         }
+        if (!options.checkAnchors) return;
+        ownAnchors ??= normalizeAnchors(collectAnchors(file.ast));
+        if (ownAnchors.has(normalizeAnchor(fragment))) return;
+        report({
+          message: `Anchor \`#${fragment}\` does not match any heading in this file`,
+          help: "Anchors use GitHub-style heading slugs (lowercase, spaces replaced by `-`).",
+          ...loc(),
+        });
         return;
       }
 
@@ -79,13 +142,12 @@ export const noBrokenReference: Rule<NoBrokenReferenceOptions> = {
         });
         return;
       }
-      if (
-        fragment &&
-        options.checkAnchors &&
-        fragment.toLowerCase() !== "top" &&
-        project.isFile(abs) &&
-        MARKDOWN_EXTENSIONS.has(extname(abs).toLowerCase())
-      ) {
+      if (!fragment || fragment.toLowerCase() === "top" || !project.isFile(abs)) return;
+      if (lineRange && usesLines(abs)) {
+        // Git-ignored files are often generated, so their length depends on the environment.
+        if (!options.checkLines || !project.contains(abs) || project.isIgnored(abs)) return;
+        checkLineRange(fragment, lineRange, project.lineCountOf(abs), `\`${pathPart}\``, loc);
+      } else if (options.checkAnchors && isMarkdownPath(abs)) {
         const anchors = project.anchorsOf(abs);
         if (anchors && !anchors.has(normalizeAnchor(fragment))) {
           report({

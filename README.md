@@ -164,7 +164,7 @@ errors, so they don't change the exit code, and `--quiet` hides them.
 | ---------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------- |
 | [`context/no-missing-path`](#contextno-missing-path)                         | recommended | Referenced files and directories exist                                    |
 | [`context/no-missing-script`](#contextno-missing-script)                     | recommended | Documented scripts and tasks (npm, make, just, uv, maven, cargo, …) exist |
-| [`context/no-broken-reference`](#contextno-broken-reference)                 | recommended | Relative links, images and `#anchors` resolve                             |
+| [`context/no-broken-reference`](#contextno-broken-reference)                 | recommended | Relative links, images, `#anchors` and `#L42` line fragments resolve      |
 | [`context/no-agent-files-drift`](#contextno-agent-files-drift)               | recommended | Agent files in one directory are identical or symlinked                   |
 | [`context/no-invalid-skill`](#contextno-invalid-skill)                       | recommended | Skill directories have a valid layout and valid `SKILL.md` frontmatter    |
 | [`context/no-misnamed-agent-file`](#contextno-misnamed-agent-file)           | recommended | Agent files are spelled in the exact case agents look for                 |
@@ -277,13 +277,20 @@ Checks relative Markdown links, images, reference definitions and `href`/`src` i
 - `#anchor` must match a heading in the same file, using GitHub-style slugs. Duplicate headings
   get `-1`, `-2` suffixes. Explicit `id`/`name` anchors also count.
 - `other.md#anchor` must match a heading in the target Markdown file.
+- Line fragments (`src/app.ts#L42`, `#L42-L50`, `#L42-50`, `#L10C5-L12C20`) must point at lines
+  that exist in the target file. Line numbers start at 1, and a range must not end before it
+  starts. GitHub renders Markdown files, so there `#L10` is checked as a heading anchor, unless
+  the link opens the source view (`guide.md?plain=1#L10`, `?plain=1#L10` for the linted file).
+  Directories, binary files, Git LFS pointers and git-ignored files (often generated) are not
+  checked.
 - Root-relative links (`/docs/x.md`) resolve against the project root, as on GitHub.
 - External URLs (`https:`, `mailto:`, `//cdn…`) and git-ignored targets are skipped.
 
-| Option         | Default | Description                           |
-| -------------- | ------- | ------------------------------------- |
-| `checkAnchors` | `true`  | Check `#fragments` against headings   |
-| `ignore`       | `[]`    | Glob patterns of link targets to skip |
+| Option         | Default | Description                                         |
+| -------------- | ------- | --------------------------------------------------- |
+| `checkAnchors` | `true`  | Check `#fragments` against headings                 |
+| `checkLines`   | `true`  | Check `#L42` line fragments against the file length |
+| `ignore`       | `[]`    | Glob patterns of link targets to skip               |
 
 ### `context/no-agent-files-drift`
 

@@ -53,11 +53,100 @@ describe("context/no-broken-reference", () => {
     const root = makeProject({
       "docs/guide.md": "# Guide\n\n## Install deps\n",
       "src/a.ts": "",
-      "AGENTS.md": "[a](docs/guide.md#install-deps) [b](docs/guide.md#nope) [c](src/a.ts#L10)\n",
+      "AGENTS.md": "[a](docs/guide.md#install-deps) [b](docs/guide.md#nope) [c](src/a.ts#main)\n",
     });
     expect(messages(await runRule(root, RULE))).toEqual([
       "Anchor `#nope` does not match any heading in `docs/guide.md`",
     ]);
+  });
+
+  test("checks line fragments against the length of the target file", async () => {
+    const root = makeProject({
+      "src/app.ts": "x\n".repeat(50),
+      "AGENTS.md": [
+        "[a](src/app.ts#L42) [b](src/app.ts#L42-L50) [c](src/app.ts#L10C5-L12C20) [d](src/app.ts#L42-50)",
+        "[e](src/app.ts#L51) [f](src/app.ts#L45-L60) [g](src/app.ts#L0) [h](src/app.ts#L50-L42)",
+        "",
+      ].join("\n"),
+    });
+    const diagnostics = await runRule(root, RULE);
+    expect(messages(diagnostics)).toEqual([
+      "Line `#L51` is out of range: `src/app.ts` has 50 lines",
+      "Line range `#L45-L60` is out of range: `src/app.ts` has 50 lines",
+      "Line `#L0` is invalid: line numbers start at 1",
+      "Line range `#L50-L42` ends before it starts",
+    ]);
+    expect(diagnostics[0]).toMatchObject({ line: 2, column: 5 });
+  });
+
+  test("counts lines like code hosts do", async () => {
+    const root = makeProject({
+      "no-eol.txt": "a\nb",
+      "crlf.txt": "a\r\nb\r\n",
+      "one.txt": "a\n",
+      "empty.txt": "",
+      "AGENTS.md": [
+        "[a](no-eol.txt#L2) [b](no-eol.txt#L3) [c](crlf.txt#L2) [d](crlf.txt#L3)",
+        "[e](one.txt#L1) [f](one.txt#L2) [g](empty.txt#L1)",
+        "",
+      ].join("\n"),
+    });
+    expect(messages(await runRule(root, RULE))).toEqual([
+      "Line `#L3` is out of range: `no-eol.txt` has 2 lines",
+      "Line `#L3` is out of range: `crlf.txt` has 2 lines",
+      "Line `#L2` is out of range: `one.txt` has 1 line",
+      "Line `#L1` is out of range: `empty.txt` has 0 lines",
+    ]);
+  });
+
+  test("checks line fragments in Markdown only in the source view (?plain=1)", async () => {
+    const root = makeProject({
+      "docs/guide.md": "# Guide\n\n## L9\n",
+      "AGENTS.md": [
+        "[a](docs/guide.md?plain=1#L3) [b](docs/guide.md?plain=1#L9) [c](docs/guide.md#L9) [d](docs/guide.md#L2)",
+        "[e](?plain=1#L2) [f](?plain=1#L3) [g](#L2)",
+        "",
+      ].join("\n"),
+    });
+    expect(messages(await runRule(root, RULE))).toEqual([
+      "Line `#L9` is out of range: `docs/guide.md` has 3 lines",
+      "Anchor `#L2` does not match any heading in `docs/guide.md`",
+      "Line `#L3` is out of range: this file has 2 lines",
+      "Anchor `#L2` does not match any heading in this file",
+    ]);
+  });
+
+  test("checks line-like fragments in rendered Markdown as anchors when checkLines is off", async () => {
+    const root = makeProject({
+      "docs/guide.md": "# Guide\n\n## L9\n",
+      "src/a.ts": "",
+      "AGENTS.md": "[a](docs/guide.md#L4) [b](docs/guide.md#L9) [c](#L1) [d](src/a.ts#L10) [e](?plain=1#L9)\n",
+      ".contextlintrc.json": { rules: { [RULE]: ["error", { checkLines: false }] } },
+    });
+    expect(messages(await run(root))).toEqual([
+      "Anchor `#L4` does not match any heading in `docs/guide.md`",
+      "Anchor `#L1` does not match any heading in this file",
+    ]);
+  });
+
+  test("checks line fragments in a non-Markdown context file itself", async () => {
+    const root = makeProject({
+      ".cursorrules": "[a](#L1) [b](#L2)\n",
+      ".contextlintrc.json": { files: [".cursorrules"] },
+    });
+    expect(messages(await run(root))).toEqual(["Line `#L2` is out of range: this file has 1 line"]);
+  });
+
+  test("skips line fragments on directories, binary, Git LFS and git-ignored files", async () => {
+    const root = makeProject({
+      ".gitignore": "dist/\n",
+      "dist/bundle.js": "x\n",
+      "img/logo.png": "\u0089PNG\r\n\u001a\n\u0000\u0000",
+      "data/schema.sql": "version https://git-lfs.github.com/spec/v1\noid sha256:4d7a2146\nsize 12345\n",
+      "docs/a.md": "",
+      "AGENTS.md": "[a](docs/#L5) [b](img/logo.png#L9) [c](dist/bundle.js#L99) [d](data/schema.sql#L120)\n",
+    });
+    expect(await runRule(root, RULE)).toEqual([]);
   });
 
   test("decodes URL-encoded paths and resolves root-relative links", async () => {
@@ -93,8 +182,11 @@ describe("context/no-broken-reference", () => {
   test("skips git-ignored targets and honors options", async () => {
     const root = makeProject({
       ".gitignore": "coverage/\n",
-      "AGENTS.md": "[cov](coverage/index.html) [gen](generated/api.md) [anchor](#nope)\n",
-      ".contextlintrc.json": { rules: { [RULE]: ["error", { ignore: ["generated/**"], checkAnchors: false }] } },
+      "src/a.ts": "",
+      "AGENTS.md": "[cov](coverage/index.html) [gen](generated/api.md) [anchor](#nope) [line](src/a.ts#L10)\n",
+      ".contextlintrc.json": {
+        rules: { [RULE]: ["error", { ignore: ["generated/**"], checkAnchors: false, checkLines: false }] },
+      },
     });
     expect(await run(root)).toEqual([]);
   });

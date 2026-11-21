@@ -400,7 +400,7 @@
           ]
         },
         "context/no-broken-reference": {
-          "description": "Relative Markdown links, images and local #anchors must resolve",
+          "description": "Relative Markdown links, images, local #anchors and #L42 line fragments must resolve",
           "oneOf": [
             {
               "oneOf": [
@@ -455,6 +455,10 @@
                     "checkAnchors": {
                       "type": "boolean",
                       "description": "Check `#fragment` anchors against document headings."
+                    },
+                    "checkLines": {
+                      "type": "boolean",
+                      "description": "Check `#L42` / `#L42-L50` line fragments against the length of the target file."
                     },
                     "ignore": {
                       "type": "array",
@@ -473,7 +477,7 @@
           ]
         },
         "no-broken-reference": {
-          "description": "Relative Markdown links, images and local #anchors must resolve",
+          "description": "Relative Markdown links, images, local #anchors and #L42 line fragments must resolve",
           "oneOf": [
             {
               "oneOf": [
@@ -528,6 +532,10 @@
                     "checkAnchors": {
                       "type": "boolean",
                       "description": "Check `#fragment` anchors against document headings."
+                    },
+                    "checkLines": {
+                      "type": "boolean",
+                      "description": "Check `#L42` / `#L42-L50` line fragments against the length of the target file."
                     },
                     "ignore": {
                       "type": "array",
@@ -1612,7 +1620,7 @@
                 ]
               },
               "context/no-broken-reference": {
-                "description": "Relative Markdown links, images and local #anchors must resolve",
+                "description": "Relative Markdown links, images, local #anchors and #L42 line fragments must resolve",
                 "oneOf": [
                   {
                     "oneOf": [
@@ -1667,6 +1675,10 @@
                           "checkAnchors": {
                             "type": "boolean",
                             "description": "Check `#fragment` anchors against document headings."
+                          },
+                          "checkLines": {
+                            "type": "boolean",
+                            "description": "Check `#L42` / `#L42-L50` line fragments against the length of the target file."
                           },
                           "ignore": {
                             "type": "array",
@@ -1685,7 +1697,7 @@
                 ]
               },
               "no-broken-reference": {
-                "description": "Relative Markdown links, images and local #anchors must resolve",
+                "description": "Relative Markdown links, images, local #anchors and #L42 line fragments must resolve",
                 "oneOf": [
                   {
                     "oneOf": [
@@ -1740,6 +1752,10 @@
                           "checkAnchors": {
                             "type": "boolean",
                             "description": "Check `#fragment` anchors against document headings."
+                          },
+                          "checkLines": {
+                            "type": "boolean",
+                            "description": "Check `#L42` / `#L42-L50` line fragments against the length of the target file."
                           },
                           "ignore": {
                             "type": "array",

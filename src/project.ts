@@ -226,6 +226,16 @@ export class Project {
     return anchors;
   }
 
+  /** Number of lines in a text file (cached). Null when unreadable or binary. */
+  lineCountOf(absPath: string): number | null {
+    return this.memo(`line-count:${absPath}`, () => {
+      const text = this.readText(absPath);
+      // A Git LFS pointer stands in for content that hasn't been pulled, so its length says nothing.
+      if (text === null || text.includes("\0") || text.startsWith(LFS_POINTER_PREFIX)) return null;
+      return countLines(text);
+    });
+  }
+
   /**
    * Resolves a relative path written in a command: against `dir` first, then its
    * ancestors up to the root (the first existing match wins), like references in
@@ -293,6 +303,17 @@ export class Project {
       return false;
     }
   }
+}
+
+const LFS_POINTER_PREFIX = "version https://git-lfs.github.com/spec/";
+
+/**
+ * Number of lines as code hosts number them: a trailing line break doesn't start a new line, and
+ * an empty file has none.
+ */
+export function countLines(text: string): number {
+  const breaks = text.match(/\r\n|\r|\n/g)?.length ?? 0;
+  return text === "" || /[\r\n]$/.test(text) ? breaks : breaks + 1;
 }
 
 export function normalizeAnchor(anchor: string): string {
