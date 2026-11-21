@@ -6,6 +6,12 @@ import type { OptionSchema } from "./schema.ts";
 /** Effective severity of a rule. */
 export type Severity = "off" | "warn" | "error";
 
+/**
+ * Severity of a reported diagnostic. `info` marks notes that are not problems (such as an unknown
+ * rule in an inline directive): they are printed but don't count as warnings or errors.
+ */
+export type DiagnosticSeverity = Exclude<Severity, "off"> | "info";
+
 /** Severity as it may be written in a config file or passed on the CLI. */
 export type SeverityInput = Severity | "allow" | "deny" | 0 | 1 | 2;
 
@@ -73,7 +79,7 @@ export interface ReportDescriptor {
 export interface Diagnostic {
   /** `null` for problems not attributed to a rule (e.g. unreadable files). */
   ruleId: string | null;
-  severity: Exclude<Severity, "off">;
+  severity: DiagnosticSeverity;
   message: string;
   help?: string;
   /** Absolute path of the file associated with this diagnostic. */

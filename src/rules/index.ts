@@ -1,3 +1,4 @@
+import { closest } from "#src/text.ts";
 import type { AnyRule, Category } from "#src/types.ts";
 
 import { keepAgentsFileUpToDate } from "./keep-agents-file-up-to-date.ts";
@@ -28,6 +29,16 @@ export function resolveRuleName(name: string): string | undefined {
   if (RULES.has(name)) return name;
   const prefixed = `${RULE_PREFIX}${name}`;
   return RULES.has(prefixed) ? prefixed : undefined;
+}
+
+/** The rule whose name is closest to `name` (with or without a prefix), for "did you mean" hints. */
+export function suggestRuleName(name: string): string | undefined {
+  const bare = name.replace(/^.*\//, "");
+  const match = closest(
+    bare,
+    [...RULES.keys()].map((rule) => rule.slice(RULE_PREFIX.length)),
+  );
+  return match === undefined ? undefined : `${RULE_PREFIX}${match}`;
 }
 
 export function rulesInCategory(category: Category): AnyRule[] {

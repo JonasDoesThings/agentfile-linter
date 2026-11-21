@@ -18,7 +18,7 @@ import { discoverFiles } from "./discovery.ts";
 import { PatternIgnore } from "./gitignore.ts";
 import { computeLineStarts, parseMarkdown } from "./markdown.ts";
 import { ALWAYS_SKIPPED_DIRS, type Project, ProjectRegistry, tryRealpath } from "./project.ts";
-import { applySuppressions, collectDirectives, type Directive } from "./suppressions.ts";
+import { applySuppressions, collectDirectives, type Directive, unknownRuleDiagnostics } from "./suppressions.ts";
 import type {
   AnyRule,
   Diagnostic,
@@ -87,6 +87,19 @@ function fileDiagnostic(filePath: string, message: string, severity: Diagnostic[
 /** Inline directives by real path, shared by the per-file and tree passes so that each file is parsed once. */
 type DirectiveCache = Map<string, Directive[]>;
 
+/** Directives of a file the per-file pass didn't parse. Only files that mention `contextlint-` are parsed. */
+function treeFileDirectives(path: string, realPath: string, registry: ProjectRegistry, cache: DirectiveCache) {
+  let directives = cache.get(realPath);
+  if (!directives) {
+    const project = registry.forDirectory(dirname(path));
+    const text = project.isFile(path) ? project.readText(path) : null;
+    directives =
+      text === null || !text.includes("contextlint-") ? [] : collectDirectives({ text, ast: parseMarkdown(text) });
+    cache.set(realPath, directives);
+  }
+  return directives;
+}
+
 /** Runs the given rules over one file. */
 export async function lintFile(
   path: string,
@@ -135,7 +148,7 @@ export async function lintFile(
     }
   };
   await Promise.all(rules.map(runRule));
-  const kept = applySuppressions(diagnostics, directives);
+  const kept = [...applySuppressions(diagnostics, directives), ...unknownRuleDiagnostics(path, directives)];
   return kept.toSorted((a, b) => a.start.line - b.start.line || a.start.column - b.start.column);
 }
 
@@ -430,18 +443,7 @@ async function lintTree(
         enabledRules.add(ruleId);
       };
       const isSuppressed = (path: string, start: Position) => {
-        const realPath = inputs.aliases.realPath(path);
-        let fileDirectives = directives.get(realPath);
-        if (!fileDirectives) {
-          const project = registry.forDirectory(dirname(path));
-          const text = project.isFile(path) ? project.readText(path) : null;
-          // Only parse files that can contain a directive (most SKILL.md files don't).
-          fileDirectives =
-            text === null || !text.includes("contextlint-")
-              ? []
-              : collectDirectives({ text, ast: parseMarkdown(text) });
-          directives.set(realPath, fileDirectives);
-        }
+        const fileDirectives = treeFileDirectives(path, inputs.aliases.realPath(path), registry, directives);
         const problem = { ...fileDiagnostic(path, ""), ruleId, start, end: start };
         return applySuppressions([problem], fileDirectives).length === 0;
       };
@@ -547,7 +549,14 @@ export async function lint(options: LintOptions = {}, prepared?: LintSetup): Pro
     ),
     lintTree(inputs, registry, resolver, ready.cwd, directives),
   ]);
-  const files = mergeDiagnostics(linted, tree.diagnostics, tree.checkedFiles, (path) => inputs.aliases.realPath(path));
+  // Directives in context files are checked by `lintFile`; these are the ones in files that only
+  // tree rules check, such as SKILL.md.
+  const realPath = (path: string) => inputs.aliases.realPath(path);
+  const lintedFiles = new Set(paths.map(realPath));
+  const directiveNotes = [...tree.checkedFiles]
+    .filter((path) => !lintedFiles.has(realPath(path)))
+    .flatMap((path) => unknownRuleDiagnostics(path, treeFileDirectives(path, realPath(path), registry, directives)));
+  const files = mergeDiagnostics(linted, [...tree.diagnostics, ...directiveNotes], tree.checkedFiles, realPath);
   const fileCount = new Set([...paths, ...tree.checkedFiles]).size;
   for (const rule of tree.enabledRules) enabledRules.add(rule);
   for (const path of [...unreadableDirectories.keys()].toSorted()) {
@@ -590,7 +599,7 @@ export async function lint(options: LintOptions = {}, prepared?: LintSetup): Pro
   for (const file of files) {
     for (const d of file.diagnostics) {
       if (d.severity === "error") errorCount++;
-      else warningCount++;
+      else if (d.severity === "warn") warningCount++;
     }
   }
   return {

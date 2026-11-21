@@ -1,11 +1,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { RULES, resolveRuleName, rulesInCategory } from "#src/rules/index.ts";
+import { RULES, resolveRuleName, rulesInCategory, suggestRuleName } from "#src/rules/index.ts";
 
 import { toPosix } from "./gitignore.ts";
 import { validate } from "./schema.ts";
-import { editDistance } from "./text.ts";
 import { type AnyRule, CATEGORIES, type Category, type Severity } from "./types.ts";
 import { isRecord } from "./util.ts";
 
@@ -73,13 +72,8 @@ export function normalizeSeverity(value: unknown): Severity | undefined {
 }
 
 function suggestRule(name: string): string {
-  const bare = name.replace(/^.*\//, "");
-  let best: { rule: string; distance: number } | undefined;
-  for (const rule of RULES.keys()) {
-    const distance = editDistance(bare, rule.replace(/^.*\//, ""));
-    if (!best || distance < best.distance) best = { rule, distance };
-  }
-  return best && best.distance <= Math.max(2, Math.floor(bare.length / 4)) ? ` Did you mean "${best.rule}"?` : "";
+  const rule = suggestRuleName(name);
+  return rule ? ` Did you mean "${rule}"?` : "";
 }
 
 function parseRuleSetting(name: string, value: unknown, where: string): [string, RuleSetting] {

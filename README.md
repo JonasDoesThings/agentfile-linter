@@ -150,6 +150,11 @@ description: Deploys the app. Use when the user asks for a deployment.
 ---
 ```
 
+A directive with a name that isn't a rule (usually a typo, or a reason without the `--`
+separator) suppresses nothing for that name. contextlint reports each such name as an `info`
+diagnostic, with a suggestion when the name is close to a rule. Infos don't count as warnings or
+errors, so they don't change the exit code, and `--quiet` hides them.
+
 ## Rules
 
 | Rule                                                                         | Category    | Checks                                                                    |

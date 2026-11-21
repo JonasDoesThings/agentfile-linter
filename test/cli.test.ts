@@ -79,6 +79,28 @@ describe("cli", () => {
     );
   });
 
+  test("unknown rules in directives are printed as info and don't fail the run", async () => {
+    const root = makeProject({ "AGENTS.md": "<!-- contextlint-disable-next-line no-mising-path -->\nHi\n" });
+    const message = "Unknown rule `no-mising-path` in `contextlint-disable-next-line` directive";
+    const result = await cli(root, "--deny-warnings");
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain(`ℹ contextlint: ${message}`);
+    expect(result.stdout).toContain("╭─[AGENTS.md:1:36]");
+    expect(result.stdout).toContain("help: Did you mean `context/no-missing-path`?");
+    expect(result.stdout).toContain("Found 0 warnings and 0 errors.");
+    expect((await cli(root, "-f", "stylish")).stdout).toBe(`AGENTS.md\n  1:36  info  ${message}\n\n`);
+    expect((await cli(root, "-f", "unix")).stdout).toBe(`AGENTS.md:1:36: ${message} [Info/contextlint]\n`);
+    expect((await cli(root, "-f", "github")).stdout).toStartWith(
+      "::notice file=AGENTS.md,line=1,endLine=1,col=36,endColumn=50,title=contextlint::",
+    );
+    expect(JSON.parse((await cli(root, "-f", "json")).stdout)).toMatchObject({
+      errors: 0,
+      warnings: 0,
+      diagnostics: [{ severity: "info", rule: null, message }],
+    });
+    expect((await cli(root, "--quiet")).stdout).not.toContain(message);
+  });
+
   test("usage and config errors exit 2", async () => {
     const root = makeProject({ ".contextlintrc.json": '{ "rules": { "nope": "error" } }' });
     expect(await cli(root)).toMatchObject({ code: 2, stderr: expect.stringContaining('unknown rule "nope"') });

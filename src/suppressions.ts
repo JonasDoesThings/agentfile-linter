@@ -1,11 +1,11 @@
 import { CST, Lexer } from "yaml";
 
-import { resolveRuleName } from "#src/rules/index.ts";
+import { resolveRuleName, suggestRuleName } from "#src/rules/index.ts";
 
 import { extractFrontmatter } from "./frontmatter.ts";
 import { visit } from "./markdown.ts";
 import { splitLines } from "./text.ts";
-import type { Diagnostic, LintedFile } from "./types.ts";
+import type { Diagnostic, LintedFile, Position } from "./types.ts";
 
 type DirectiveKind = "disable" | "enable" | "disable-line" | "disable-next-line";
 
@@ -15,6 +15,14 @@ export interface Directive {
   rules: Set<string> | null;
   line: number;
   endLine: number;
+  /** Names that are not rules (most likely typos), which suppress nothing. */
+  unknownRules: UnknownRule[];
+}
+
+export interface UnknownRule {
+  name: string;
+  start: Position;
+  end: Position;
 }
 
 const DIRECTIVE_RE = /<!--\s*contextlint-(disable-next-line|disable-line|disable|enable)\b([\s\S]*?)-->/g;
@@ -32,17 +40,32 @@ function yamlComments(source: string): { text: string; line: number }[] {
   return comments;
 }
 
-/** Rule names of a directive (before an optional `-- reason`), or null for all rules. */
-function parseRules(text: string): Set<string> | null {
-  const list = text.split(/\s--\s|^--\s/)[0]?.trim() ?? "";
-  if (!list) return null;
-  return new Set(
-    list
-      .split(/[\s,]+/)
-      .filter(Boolean)
-      .map((r) => resolveRuleName(r) ?? r),
-  );
+interface ParsedRules {
+  /** Rule names, or null for all rules. */
+  rules: Set<string> | null;
+  /** Names that are not rules, with their offset in the parsed text. */
+  unknown: { name: string; index: number }[];
 }
+
+/** Rule names of a directive (before an optional `-- reason`). */
+function parseRules(text: string): ParsedRules {
+  const list = text.split(/\s--\s|^--\s/)[0] ?? "";
+  if (!list.trim()) return { rules: null, unknown: [] };
+  const rules = new Set<string>();
+  const unknown: ParsedRules["unknown"] = [];
+  for (const { 0: name, index } of list.matchAll(/[^\s,]+/g)) {
+    const rule = resolveRuleName(name);
+    rules.add(rule ?? name);
+    if (!rule) unknown.push({ name, index });
+  }
+  return { rules, unknown };
+}
+
+const nameRange = (name: string, start: Position): UnknownRule => ({
+  name,
+  start,
+  end: { line: start.line, column: start.column + name.length },
+});
 
 /**
  * The frontmatter source and its first line. A closed block is the parser's `yaml` node. The parser
@@ -65,15 +88,21 @@ function frontmatterDirectives(file: Pick<LintedFile, "ast" | "text">): Directiv
   const frontmatter = frontmatterSource(file);
   if (!frontmatter) return [];
   const directives: Directive[] = [];
+  const lines = frontmatter.source.split("\n");
   for (const comment of yamlComments(frontmatter.source)) {
     const match = COMMENT_DIRECTIVE_RE.exec(comment.text);
     if (!match) continue;
     const kind = match[1] as DirectiveKind;
-    const rules = parseRules(match[2] as string);
+    const list = match[2] as string;
+    const { rules, unknown } = parseRules(list);
     const line = frontmatter.firstLine + comment.line;
-    directives.push({ kind, rules, line, endLine: line });
+    // A comment runs to the end of its line; the rule list ends it.
+    const sourceLine = lines[comment.line] ?? "";
+    const listColumn = Math.max(0, sourceLine.lastIndexOf(comment.text)) + comment.text.length - list.length + 1;
+    const unknownRules = unknown.map(({ name, index }) => nameRange(name, { line, column: listColumn + index }));
+    directives.push({ kind, rules, line, endLine: line, unknownRules });
     // Problems with the frontmatter as a whole are reported on the opening `---`.
-    if (kind === "disable") directives.push({ kind: "disable-line", rules, line: 1, endLine: 1 });
+    if (kind === "disable") directives.push({ kind: "disable-line", rules, line: 1, endLine: 1, unknownRules: [] });
   }
   return directives;
 }
@@ -86,16 +115,56 @@ function frontmatterDirectives(file: Pick<LintedFile, "ast" | "text">): Directiv
  */
 export function collectDirectives(file: Pick<LintedFile, "ast" | "text">): Directive[] {
   const directives = frontmatterDirectives(file);
+  let sourceLines: string[] | undefined;
   visit(file.ast, "html", (node) => {
-    const startLine = node.position?.start.line ?? 1;
+    const nodeStart = node.position?.start ?? { line: 1, column: 1 };
+    /** Position of an offset in the node's value. */
+    const positionAt = (offset: number): Position => {
+      const before = node.value.slice(0, offset);
+      const line = nodeStart.line + (before.match(/\n/g)?.length ?? 0);
+      const newline = before.lastIndexOf("\n");
+      if (newline === -1) return { line, column: nodeStart.column + offset };
+      // Later lines of the value lack their container prefix (`> `, list indentation), so find
+      // where the line's text starts in the source.
+      const valueLine = node.value.slice(newline + 1).split(/\r?\n/, 1)[0] ?? "";
+      sourceLines ??= splitLines(file.text);
+      const indent = Math.max(0, (sourceLines[line - 1] ?? "").indexOf(valueLine));
+      return { line, column: indent + offset - newline };
+    };
     for (const match of node.value.matchAll(DIRECTIVE_RE)) {
-      const before = node.value.slice(0, match.index);
-      const line = startLine + (before.match(/\n/g)?.length ?? 0);
+      const line = positionAt(match.index).line;
       const endLine = line + (match[0].match(/\n/g)?.length ?? 0);
-      directives.push({ kind: match[1] as DirectiveKind, rules: parseRules(match[2] as string), line, endLine });
+      const list = match[2] as string;
+      const listOffset = match.index + match[0].length - "-->".length - list.length;
+      const { rules, unknown } = parseRules(list);
+      const unknownRules = unknown.map(({ name, index }) => nameRange(name, positionAt(listOffset + index)));
+      directives.push({ kind: match[1] as DirectiveKind, rules, line, endLine, unknownRules });
     }
   });
   return directives;
+}
+
+/**
+ * Info diagnostics for names in directives that are not rules. Such a directive suppresses
+ * nothing for that name, which is easy to miss when the name has a typo.
+ */
+export function unknownRuleDiagnostics(filePath: string, directives: readonly Directive[]): Diagnostic[] {
+  return directives.flatMap((directive) =>
+    directive.unknownRules.map(({ name, start, end }): Diagnostic => {
+      const suggestion = suggestRuleName(name);
+      return {
+        ruleId: null,
+        severity: "info",
+        message: `Unknown rule \`${name}\` in \`contextlint-${directive.kind}\` directive`,
+        help: suggestion
+          ? `Did you mean \`${suggestion}\`?`
+          : "`contextlint --rules` lists all rules. Separate a reason from the rule names with ` -- `.",
+        filePath,
+        start,
+        end,
+      };
+    }),
+  );
 }
 
 function applies(directive: Directive, ruleId: string): boolean {
