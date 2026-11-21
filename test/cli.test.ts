@@ -22,11 +22,11 @@ async function cli(cwd: string, ...args: string[]) {
 }
 
 describe("cli", () => {
-  test("`contextlint .` works without config and exits 1 on errors", async () => {
+  test("`agentfile-linter .` works without config and exits 1 on errors", async () => {
     const root = makeProject({ "AGENTS.md": "# Hi\n\nSee `src/missing.ts`.\n" });
     const { stdout, code } = await cli(root, ".");
     expect(code).toBe(1);
-    expect(stdout).toContain("× context(no-missing-path): Path `src/missing.ts` does not exist");
+    expect(stdout).toContain("× agentfile(no-missing-path): Path `src/missing.ts` does not exist");
     expect(stdout).toContain("╭─[AGENTS.md:3:6]");
     expect(stdout).toContain("Found 0 warnings and 1 error.");
     expect(stdout).toContain("on 1 file with 5 rules");
@@ -60,8 +60,8 @@ describe("cli", () => {
       number_of_files: 1,
       diagnostics: [
         {
-          code: "context(no-missing-path)",
-          rule: "context/no-missing-path",
+          code: "agentfile(no-missing-path)",
+          rule: "agentfile/no-missing-path",
           severity: "error",
           filename: "AGENTS.md",
           start: { line: 1, column: 2 },
@@ -69,29 +69,29 @@ describe("cli", () => {
       ],
     });
     expect((await cli(root, "-f", "stylish")).stdout).toContain(
-      "  1:2  error  Path `missing.ts` does not exist  context/no-missing-path",
+      "  1:2  error  Path `missing.ts` does not exist  agentfile/no-missing-path",
     );
     expect((await cli(root, "--format=github")).stdout).toStartWith(
-      "::error file=AGENTS.md,line=1,endLine=1,col=2,endColumn=12,title=context/no-missing-path::",
+      "::error file=AGENTS.md,line=1,endLine=1,col=2,endColumn=12,title=agentfile/no-missing-path::",
     );
     expect((await cli(root, "-f", "unix")).stdout).toBe(
-      "AGENTS.md:1:2: Path `missing.ts` does not exist [Error/context/no-missing-path]\n\n1 problem\n",
+      "AGENTS.md:1:2: Path `missing.ts` does not exist [Error/agentfile/no-missing-path]\n\n1 problem\n",
     );
   });
 
   test("unknown rules in directives are printed as info and don't fail the run", async () => {
-    const root = makeProject({ "AGENTS.md": "<!-- contextlint-disable-next-line no-mising-path -->\nHi\n" });
-    const message = "Unknown rule `no-mising-path` in `contextlint-disable-next-line` directive";
+    const root = makeProject({ "AGENTS.md": "<!-- agentfile-linter-disable-next-line no-mising-path -->\nHi\n" });
+    const message = "Unknown rule `no-mising-path` in `agentfile-linter-disable-next-line` directive";
     const result = await cli(root, "--deny-warnings");
     expect(result.code).toBe(0);
-    expect(result.stdout).toContain(`ℹ contextlint: ${message}`);
-    expect(result.stdout).toContain("╭─[AGENTS.md:1:36]");
-    expect(result.stdout).toContain("help: Did you mean `context/no-missing-path`?");
+    expect(result.stdout).toContain(`ℹ agentfile-linter: ${message}`);
+    expect(result.stdout).toContain("╭─[AGENTS.md:1:41]");
+    expect(result.stdout).toContain("help: Did you mean `agentfile/no-missing-path`?");
     expect(result.stdout).toContain("Found 0 warnings and 0 errors.");
-    expect((await cli(root, "-f", "stylish")).stdout).toBe(`AGENTS.md\n  1:36  info  ${message}\n\n`);
-    expect((await cli(root, "-f", "unix")).stdout).toBe(`AGENTS.md:1:36: ${message} [Info/contextlint]\n`);
+    expect((await cli(root, "-f", "stylish")).stdout).toBe(`AGENTS.md\n  1:41  info  ${message}\n\n`);
+    expect((await cli(root, "-f", "unix")).stdout).toBe(`AGENTS.md:1:41: ${message} [Info/agentfile-linter]\n`);
     expect((await cli(root, "-f", "github")).stdout).toStartWith(
-      "::notice file=AGENTS.md,line=1,endLine=1,col=36,endColumn=50,title=contextlint::",
+      "::notice file=AGENTS.md,line=1,endLine=1,col=41,endColumn=55,title=agentfile-linter::",
     );
     expect(JSON.parse((await cli(root, "-f", "json")).stdout)).toMatchObject({
       errors: 0,
@@ -102,7 +102,7 @@ describe("cli", () => {
   });
 
   test("usage and config errors exit 2", async () => {
-    const root = makeProject({ ".contextlintrc.json": '{ "rules": { "nope": "error" } }' });
+    const root = makeProject({ ".agentfile-linterrc.json": '{ "rules": { "nope": "error" } }' });
     expect(await cli(root)).toMatchObject({ code: 2, stderr: expect.stringContaining('unknown rule "nope"') });
     expect((await cli(root, "--nope")).code).toBe(2);
     expect((await cli(root, "-f", "xml", "-c", "x.json")).code).toBe(2);
@@ -111,27 +111,27 @@ describe("cli", () => {
   test("--init, --rules, --print-config, --version, --help", async () => {
     const root = makeProject({});
     expect((await cli(root, "--init")).code).toBe(0);
-    const config = Bun.JSONC.parse(readFileSync(join(root, ".contextlintrc.json"), "utf8"));
+    const config = Bun.JSONC.parse(readFileSync(join(root, ".agentfile-linterrc.json"), "utf8"));
     expect(config).toEqual({ categories: { recommended: "error" }, rules: {}, ignorePatterns: [] });
     expect((await cli(root, "--init")).code).toBe(2);
 
     const rules = (await cli(root, "--rules")).stdout;
-    expect(rules).toMatch(/^context\/no-agent-files-drift +recommended +error /m);
-    expect(rules).toMatch(/^context\/keep-agents-file-up-to-date +- +warn /m);
+    expect(rules).toMatch(/^agentfile\/no-agent-files-drift +recommended +error /m);
+    expect(rules).toMatch(/^agentfile\/keep-agents-file-up-to-date +- +warn /m);
     const printed = JSON.parse((await cli(root, "--print-config", "-A", "no-missing-script")).stdout);
-    expect(printed.configFile).toBe(".contextlintrc.json");
-    expect(printed.rules["context/no-missing-script"]).toBe("off");
-    expect((await cli(root, "-V")).stdout).toMatch(/^contextlint \d+\.\d+\.\d+\n$/);
-    expect((await cli(root, "-h")).stdout).toContain("Usage: contextlint [OPTIONS] [PATH]...");
+    expect(printed.configFile).toBe(".agentfile-linterrc.json");
+    expect(printed.rules["agentfile/no-missing-script"]).toBe("off");
+    expect((await cli(root, "-V")).stdout).toMatch(/^agentfile-linter \d+\.\d+\.\d+\n$/);
+    expect((await cli(root, "-h")).stdout).toContain("Usage: agentfile-linter [OPTIONS] [PATH]...");
   });
 
   test("--init preserves an existing JSONC config", async () => {
     const root = makeProject({
-      ".contextlintrc.jsonc": { categories: { recommended: "off" } },
+      ".agentfile-linterrc.jsonc": { categories: { recommended: "off" } },
       "AGENTS.md": "`missing.ts`\n",
     });
-    expect(await cli(root, "--init")).toMatchObject({ code: 2, stderr: ".contextlintrc.jsonc already exists.\n" });
-    expect(existsSync(join(root, ".contextlintrc.json"))).toBe(false);
+    expect(await cli(root, "--init")).toMatchObject({ code: 2, stderr: ".agentfile-linterrc.jsonc already exists.\n" });
+    expect(existsSync(join(root, ".agentfile-linterrc.json"))).toBe(false);
     expect((await cli(root)).code).toBe(0);
   });
 
@@ -157,7 +157,7 @@ describe("cli", () => {
       "custom/a/SKILL.md": "# Missing frontmatter\n",
       "custom/b/SKILL.md": "# Missing frontmatter\n",
       ".gitignore": "custom/b/\n",
-      ".contextlintrc.json": {
+      ".agentfile-linterrc.json": {
         overrides: [{ files: ["custom/**"], rules: { "no-invalid-skill": ["error", { directories: ["custom"] }] } }],
       },
     });
@@ -196,7 +196,7 @@ describe("cli", () => {
 
   test("warns when an explicitly named file is skipped by a configured ignore", async () => {
     const root = makeProject({
-      ".contextlintrc.json": { ignorePatterns: ["generated/"] },
+      ".agentfile-linterrc.json": { ignorePatterns: ["generated/"] },
       ".gitignore": "local/\n",
       "generated/AGENTS.md": "`missing.ts`\n",
       "local/AGENTS.md": "# Local instructions\n",
@@ -225,10 +225,10 @@ describe("cli", () => {
 });
 
 describe("compiled binary", () => {
-  const bin = process.env.CONTEXTLINT_TEST_BINARY ?? join(import.meta.dir, "..", "dist", "contextlint");
-  const testBinary = test.skipIf(!process.env.CONTEXTLINT_TEST_BINARY && !existsSync(bin));
+  const bin = process.env.AGENTFILE_LINTER_TEST_BINARY ?? join(import.meta.dir, "..", "dist", "agentfile-linter");
+  const testBinary = test.skipIf(!process.env.AGENTFILE_LINTER_TEST_BINARY && !existsSync(bin));
 
-  testBinary("dist/contextlint lints a project", async () => {
+  testBinary("dist/agentfile-linter lints a project", async () => {
     const root = makeProject({ "AGENTS.md": "`missing.ts`\n", "CLAUDE.md": "@AGENTS.md\n" });
     const proc = Bun.spawn([bin, "-f", "unix"], {
       cwd: root,
@@ -240,7 +240,7 @@ describe("compiled binary", () => {
     expect(stdout).toContain("AGENTS.md:1:2: Path `missing.ts` does not exist");
   });
 
-  testBinary("dist/contextlint ignores Bun runtime config in the scanned project", async () => {
+  testBinary("dist/agentfile-linter ignores Bun runtime config in the scanned project", async () => {
     const root = makeProject({
       "AGENTS.md": "`missing.ts`\n",
       "bunfig.toml": "invalid [ config\n",

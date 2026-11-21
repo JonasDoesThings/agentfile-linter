@@ -25,9 +25,9 @@ export interface UnknownRule {
   end: Position;
 }
 
-const DIRECTIVE_RE = /<!--\s*contextlint-(disable-next-line|disable-line|disable|enable)\b([\s\S]*?)-->/g;
-/** The same directives as YAML comments in frontmatter: `# contextlint-disable-next-line rule`. */
-const COMMENT_DIRECTIVE_RE = /^#\s*contextlint-(disable-next-line|disable-line|disable|enable)\b(.*)$/;
+const DIRECTIVE_RE = /<!--\s*agentfile-linter-(disable-next-line|disable-line|disable|enable)\b([\s\S]*?)-->/g;
+/** The same directives as YAML comments in frontmatter: `# agentfile-linter-disable-next-line rule`. */
+const COMMENT_DIRECTIVE_RE = /^#\s*agentfile-linter-(disable-next-line|disable-line|disable|enable)\b(.*)$/;
 
 /** YAML comments with their 0-based line in `source`. Text in scalars and quoted strings is skipped. */
 function yamlComments(source: string): { text: string; line: number }[] {
@@ -108,8 +108,8 @@ function frontmatterDirectives(file: Pick<LintedFile, "ast" | "text">): Directiv
 }
 
 /**
- * Collects `<!-- contextlint-disable[-line|-next-line] [rules] -->` and
- * `<!-- contextlint-enable [rules] -->` comments. A `-- reason` suffix is allowed.
+ * Collects `<!-- agentfile-linter-disable[-line|-next-line] [rules] -->` and
+ * `<!-- agentfile-linter-enable [rules] -->` comments. A `-- reason` suffix is allowed.
  * Frontmatter has to start on the first line, so it takes the directives as `#` comments
  * instead, and a `disable` there also covers the opening `---`.
  */
@@ -155,10 +155,10 @@ export function unknownRuleDiagnostics(filePath: string, directives: readonly Di
       return {
         ruleId: null,
         severity: "info",
-        message: `Unknown rule \`${name}\` in \`contextlint-${directive.kind}\` directive`,
+        message: `Unknown rule \`${name}\` in \`agentfile-linter-${directive.kind}\` directive`,
         help: suggestion
           ? `Did you mean \`${suggestion}\`?`
-          : "`contextlint --rules` lists all rules. Separate a reason from the rule names with ` -- `.",
+          : "`agentfile-linter --rules` lists all rules. Separate a reason from the rule names with ` -- `.",
         filePath,
         start,
         end,

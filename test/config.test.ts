@@ -12,12 +12,12 @@ const enabled = (resolver: RuleResolver, file = "/x/AGENTS.md"): Record<string, 
   Object.fromEntries(resolver.forFile(file).map((r) => [r.rule.meta.name, r.severity]));
 
 const ALL_ERROR: Record<string, string> = {
-  "context/no-missing-path": "error",
-  "context/no-missing-script": "error",
-  "context/no-broken-reference": "error",
-  "context/no-agent-files-drift": "error",
-  "context/no-invalid-skill": "error",
-  "context/no-misnamed-agent-file": "error",
+  "agentfile/no-missing-path": "error",
+  "agentfile/no-missing-script": "error",
+  "agentfile/no-broken-reference": "error",
+  "agentfile/no-agent-files-drift": "error",
+  "agentfile/no-invalid-skill": "error",
+  "agentfile/no-misnamed-agent-file": "error",
 };
 
 describe("rule resolution", () => {
@@ -27,11 +27,11 @@ describe("rule resolution", () => {
 
   test("config rules layer on top of the recommended set", () => {
     const config = parseConfig(
-      { rules: { "context/no-missing-path": "error", "no-missing-script": "warn" } },
+      { rules: { "agentfile/no-missing-path": "error", "no-missing-script": "warn" } },
       null,
       "/x",
     );
-    expect(enabled(new RuleResolver(config))).toEqual({ ...ALL_ERROR, "context/no-missing-script": "warn" });
+    expect(enabled(new RuleResolver(config))).toEqual({ ...ALL_ERROR, "agentfile/no-missing-script": "warn" });
   });
 
   test("categories set the severity of all their rules, rules override categories", () => {
@@ -41,11 +41,11 @@ describe("rule resolution", () => {
       "/x",
     );
     expect(enabled(new RuleResolver(config))).toEqual({
-      "context/no-missing-path": "warn",
-      "context/no-missing-script": "warn",
-      "context/no-agent-files-drift": "error",
-      "context/no-invalid-skill": "warn",
-      "context/no-misnamed-agent-file": "warn",
+      "agentfile/no-missing-path": "warn",
+      "agentfile/no-missing-script": "warn",
+      "agentfile/no-agent-files-drift": "error",
+      "agentfile/no-invalid-skill": "warn",
+      "agentfile/no-misnamed-agent-file": "warn",
     });
   });
 
@@ -54,9 +54,9 @@ describe("rule resolution", () => {
     const resolver = new RuleResolver(config, [
       { severity: "off", target: "all" },
       { severity: "error", target: "no-missing-path" },
-      { severity: "warn", target: "context/no-missing-script" },
+      { severity: "warn", target: "agentfile/no-missing-script" },
     ]);
-    expect(enabled(resolver)).toEqual({ "context/no-missing-path": "error", "context/no-missing-script": "warn" });
+    expect(enabled(resolver)).toEqual({ "agentfile/no-missing-path": "error", "agentfile/no-missing-script": "warn" });
     const categories = new RuleResolver(config, [{ severity: "warn", target: "recommended" }]);
     expect(Object.values(enabled(categories))).toEqual(["warn", "warn", "warn", "warn", "warn", "warn"]);
   });
@@ -73,9 +73,9 @@ describe("rule resolution", () => {
       "/x",
     );
     const resolver = new RuleResolver(config);
-    expect(enabled(resolver, "/x/packages/legacy/AGENTS.md")["context/no-missing-path"]).toBeUndefined();
-    expect(enabled(resolver, "/x/packages/other/AGENTS.md")["context/no-missing-path"]).toBe("error");
-    const gemini = resolver.forFile("/x/sub/GEMINI.md").find((r) => r.rule.meta.name === "context/no-missing-script");
+    expect(enabled(resolver, "/x/packages/legacy/AGENTS.md")["agentfile/no-missing-path"]).toBeUndefined();
+    expect(enabled(resolver, "/x/packages/other/AGENTS.md")["agentfile/no-missing-path"]).toBe("error");
+    const gemini = resolver.forFile("/x/sub/GEMINI.md").find((r) => r.rule.meta.name === "agentfile/no-missing-script");
     expect(gemini).toMatchObject({ severity: "warn", options: { ignore: ["x"] } });
   });
 
@@ -83,12 +83,12 @@ describe("rule resolution", () => {
     const config = parseConfig({ rules: { "no-missing-path": ["error", { checkImports: false }] } }, null, "/x");
     const rule = new RuleResolver(config)
       .forFile("/x/AGENTS.md")
-      .find((r) => r.rule.meta.name === "context/no-missing-path");
+      .find((r) => r.rule.meta.name === "agentfile/no-missing-path");
     expect(rule?.options).toEqual({ ignore: [], allowSuffixMatch: true, checkImports: false });
   });
 
   test("matching overrides inherit options and replace only explicit keys", () => {
-    const name = "context/no-missing-path";
+    const name = "agentfile/no-missing-path";
     const config = parseConfig(
       {
         rules: { [name]: ["error", { checkImports: false, ignore: ["generated/**"] }] },
@@ -121,7 +121,7 @@ describe("rule resolution", () => {
 describe("config validation", () => {
   test.each([
     [{ rules: { "no-such-rule": "error" } }, /unknown rule "no-such-rule"/],
-    [{ rules: { "no-missing-paht": "error" } }, /Did you mean "context\/no-missing-path"/],
+    [{ rules: { "no-missing-paht": "error" } }, /Did you mean "agentfile\/no-missing-path"/],
     [{ rules: { "no-missing-path": "loud" } }, /invalid severity "loud"/],
     [{ rules: { "no-missing-path": ["error", { nope: 1 }] } }, /unknown property "nope"/],
     [{ rules: { "no-invalid-skill": ["error", { toString: 1 }] } }, /unknown property "toString"/],
@@ -143,19 +143,19 @@ describe("config validation", () => {
 });
 
 describe("config files", () => {
-  test("auto-discovers .contextlintrc.json (JSONC) in parent directories", async () => {
+  test("auto-discovers .agentfile-linterrc.json (JSONC) in parent directories", async () => {
     const root = makeProject({
-      ".contextlintrc.json": '{\n  // comment\n  "rules": { "no-missing-path": "off", },\n}\n',
+      ".agentfile-linterrc.json": '{\n  // comment\n  "rules": { "no-missing-path": "off", },\n}\n',
       "packages/a/AGENTS.md": "`missing.ts`\n",
     });
     const { config } = setup({ cwd: join(root, "packages/a") });
-    expect(config.path).toBe(join(root, ".contextlintrc.json"));
+    expect(config.path).toBe(join(root, ".agentfile-linterrc.json"));
     expect(await run(join(root, "packages/a"))).toEqual([]);
   });
 
-  test(".contextlintrc.jsonc is supported, -c selects an explicit file", async () => {
+  test(".agentfile-linterrc.jsonc is supported, -c selects an explicit file", async () => {
     const root = makeProject({
-      ".contextlintrc.jsonc": '{ "rules": { "no-missing-path": "warn" } }',
+      ".agentfile-linterrc.jsonc": '{ "rules": { "no-missing-path": "warn" } }',
       "strict.json": '{ "categories": { "recommended": "off" } }',
       "AGENTS.md": "`missing.ts`\n",
     });
@@ -165,7 +165,7 @@ describe("config files", () => {
 
   test("`files` replaces the set of linted files", async () => {
     const root = makeProject({
-      ".contextlintrc.json": { files: ["AGENTS.md", ".github/copilot-instructions.md"] },
+      ".agentfile-linterrc.json": { files: ["AGENTS.md", ".github/copilot-instructions.md"] },
       "CLAUDE.md": "`missing.ts`\n",
       ".github/copilot-instructions.md": "`missing.ts`\n",
     });
@@ -178,7 +178,7 @@ describe("config files", () => {
   });
 
   test("messages are stable for invalid JSON", async () => {
-    const root = makeProject({ ".contextlintrc.json": "{ nope" });
+    const root = makeProject({ ".agentfile-linterrc.json": "{ nope" });
     expect(() => setup({ cwd: root })).toThrow(/Failed to parse/);
     expect(messages(await run(root, { config: false }))).toEqual([]);
   });

@@ -1,8 +1,8 @@
 /**
  * Builds standalone executables with `bun build --compile`.
  *
- *   bun run scripts/build.ts          # current platform -> dist/contextlint
- *   bun run scripts/build.ts --all    # every supported target -> dist/contextlint-<target>
+ *   bun run scripts/build.ts          # current platform -> dist/agentfile-linter
+ *   bun run scripts/build.ts --all    # every supported target -> dist/agentfile-linter-<target>
  */
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -23,7 +23,7 @@ const dist = join(root, "dist");
 const all = process.argv.includes("--all");
 
 async function build(target?: (typeof TARGETS)[number]) {
-  const name = target ? `contextlint-${target.replace(/^bun-/, "")}` : "contextlint";
+  const name = target ? `agentfile-linter-${target.replace(/^bun-/, "")}` : "agentfile-linter";
   const outfile = join(dist, target?.includes("windows") ? `${name}.exe` : name);
   const cmd = [
     "bun",

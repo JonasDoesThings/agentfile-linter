@@ -5,13 +5,13 @@ import { join } from "node:path";
 import { lint } from "#src/linter.ts";
 import { commit, makeProject, run, runRule } from "#test/helpers.ts";
 
-const RULE = "context/no-unnecessary-agent-files";
+const RULE = "agentfile/no-unnecessary-agent-files";
 const CONTENT = "# Agents\n\nUse pnpm.\n";
 
 const summary = async (root: string) =>
   (await runRule(root, RULE)).map((d) => [d.file, d.line, d.message, d.help?.match(/\(`(.+)`\)\.$/)?.[1]]);
 
-describe("context/no-unnecessary-agent-files", () => {
+describe("agentfile/no-unnecessary-agent-files", () => {
   test("CLAUDE.md symlinked to AGENTS.md is reported once", async () => {
     const root = makeProject({ "AGENTS.md": CONTENT, "CLAUDE.md": { symlink: "AGENTS.md" } });
     commit(root);
@@ -307,7 +307,7 @@ describe("context/no-unnecessary-agent-files", () => {
       "CLAUDE.md": { symlink: "AGENTS.md" },
       "app/AGENTS.md": CONTENT,
       "app/CLAUDE.md": "@AGENTS.md\n",
-      ".contextlintrc.json": {
+      ".agentfile-linterrc.json": {
         categories: { recommended: "off" },
         rules: { [RULE]: "warn" },
         overrides: [{ files: ["/CLAUDE.md"], rules: { [RULE]: "off" } }],
@@ -322,7 +322,7 @@ describe("context/no-unnecessary-agent-files", () => {
       "CLAUDE.md": { symlink: "AGENTS.md" },
       "app/AGENTS.md": CONTENT,
       "app/CLAUDE.md": "@AGENTS.md\n",
-      ".contextlintrc.json": {
+      ".agentfile-linterrc.json": {
         files: ["AGENTS.md", "app/CLAUDE.md"],
         categories: { recommended: "off" },
         rules: { [RULE]: "warn" },
@@ -335,7 +335,7 @@ describe("context/no-unnecessary-agent-files", () => {
     const root = makeProject({
       "AGENTS.md": CONTENT,
       "CLAUDE.md": { symlink: "AGENTS.md" },
-      ".contextlintrc.json": {
+      ".agentfile-linterrc.json": {
         categories: { recommended: "off" },
         overrides: [{ files: ["CLAUDE.md"], rules: { [RULE]: "warn" } }],
       },
@@ -351,7 +351,7 @@ describe("context/no-unnecessary-agent-files", () => {
   test("an inline suppression retains the parent CLAUDE.md", async () => {
     const root = makeProject({
       "AGENTS.md": CONTENT,
-      "CLAUDE.md": `<!-- contextlint-disable ${RULE} -->\n@AGENTS.md\n`,
+      "CLAUDE.md": `<!-- agentfile-linter-disable ${RULE} -->\n@AGENTS.md\n`,
       "app/AGENTS.md": CONTENT,
       "app/CLAUDE.md": "@AGENTS.md\n",
     });
@@ -361,7 +361,7 @@ describe("context/no-unnecessary-agent-files", () => {
   test("counts as an enabled rule when it finds nothing", async () => {
     const root = makeProject({
       "AGENTS.md": CONTENT,
-      ".contextlintrc.json": { categories: { recommended: "off" }, rules: { [RULE]: "warn" } },
+      ".agentfile-linterrc.json": { categories: { recommended: "off" }, rules: { [RULE]: "warn" } },
     });
     expect(await lint({ cwd: root })).toMatchObject({ fileCount: 1, ruleCount: 1, warningCount: 0 });
   });

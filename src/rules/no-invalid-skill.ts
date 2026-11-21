@@ -195,7 +195,7 @@ class SkillDiscovery {
     for (const dir of this.ctx.directories) {
       if (this.ctx.projectFor(dirname(dir)).isSymlink(dir)) this.addLinkedDirectories(dir, directories);
     }
-    // A path inside a skills directory (`contextlint .claude/skills/foo`) is checked when that
+    // A path inside a skills directory (`agentfile-linter .claude/skills/foo`) is checked when that
     // skills directory is in the project. Directories outside the project never count.
     for (const dir of [...this.ctx.directoryInputs, ...this.ctx.explicitFiles.map(dirname)]) {
       const { root } = this.ctx.projectFor(dir);
@@ -544,7 +544,7 @@ function checkFields(
 
 export const noInvalidSkill: Rule<NoInvalidSkillOptions, SkillInput> = {
   meta: {
-    name: "context/no-invalid-skill",
+    name: "agentfile/no-invalid-skill",
     description: "Skill directories must have a valid layout and SKILL.md files valid frontmatter",
     categories: ["recommended"],
     defaultSeverity: "error",

@@ -56,7 +56,7 @@ function modification(path: string, project: Project): LastUpdate | null {
 
 export const keepAgentsFileUpToDate: Rule<KeepAgentsFileUpToDateOptions> = {
   meta: {
-    name: "context/keep-agents-file-up-to-date",
+    name: "agentfile/keep-agents-file-up-to-date",
     description: "Context files must be revisited regularly (judged by their last Git commit or modification time)",
     categories: [],
     defaultSeverity: "warn",

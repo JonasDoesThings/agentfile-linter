@@ -27,17 +27,17 @@ function rulesSchema(): Record<string, unknown> {
       ],
     };
     properties[rule.meta.name] = setting;
-    properties[rule.meta.name.replace(/^context\//, "")] = setting;
+    properties[rule.meta.name.replace(/^agentfile\//, "")] = setting;
   }
   return { type: "object", properties, additionalProperties: false };
 }
 
-/** JSON schema for .contextlintrc.json, generated from the rule registry. */
+/** JSON schema for .agentfile-linterrc.json, generated from the rule registry. */
 export function buildConfigSchema(): Record<string, unknown> {
   const rules = rulesSchema();
   return {
     $schema: "https://json-schema.org/draft/2020-12/schema",
-    title: "contextlint configuration",
+    title: "agentfile-linter configuration",
     type: "object",
     additionalProperties: false,
     properties: {

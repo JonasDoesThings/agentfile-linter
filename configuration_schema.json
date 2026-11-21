@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "contextlint configuration",
+  "title": "agentfile-linter configuration",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -47,7 +47,7 @@
     "rules": {
       "type": "object",
       "properties": {
-        "context/no-missing-path": {
+        "agentfile/no-missing-path": {
           "description": "Referenced files and directories (in code spans and @imports) must exist",
           "oneOf": [
             {
@@ -201,7 +201,7 @@
             }
           ]
         },
-        "context/no-missing-script": {
+        "agentfile/no-missing-script": {
           "description": "Documented scripts and tasks (npm/pnpm/yarn/bun/deno, make, just, task, poetry/uv/pdm/hatch/tox/nox, maven, gradle, composer, cargo) must exist",
           "oneOf": [
             {
@@ -399,7 +399,7 @@
             }
           ]
         },
-        "context/no-broken-reference": {
+        "agentfile/no-broken-reference": {
           "description": "Relative Markdown links, images, local #anchors and #L42 line fragments must resolve",
           "oneOf": [
             {
@@ -553,7 +553,7 @@
             }
           ]
         },
-        "context/no-agent-files-drift": {
+        "agentfile/no-agent-files-drift": {
           "description": "AGENTS.md, CLAUDE.md, GEMINI.md, ... in the same directory must be identical or symlinked",
           "oneOf": [
             {
@@ -699,7 +699,7 @@
             }
           ]
         },
-        "context/no-invalid-skill": {
+        "agentfile/no-invalid-skill": {
           "description": "Skill directories must have a valid layout and SKILL.md files valid frontmatter",
           "oneOf": [
             {
@@ -845,7 +845,7 @@
             }
           ]
         },
-        "context/no-misnamed-agent-file": {
+        "agentfile/no-misnamed-agent-file": {
           "description": "AGENTS.md, CLAUDE.md, ... must be named in the exact case agents look for",
           "oneOf": [
             {
@@ -957,7 +957,7 @@
             }
           ]
         },
-        "context/no-unnecessary-agent-files": {
+        "agentfile/no-unnecessary-agent-files": {
           "description": "CLAUDE.md must not merely mirror AGENTS.md, which Claude Code reads itself",
           "oneOf": [
             {
@@ -1069,7 +1069,7 @@
             }
           ]
         },
-        "context/keep-agents-file-up-to-date": {
+        "agentfile/keep-agents-file-up-to-date": {
           "description": "Context files must be revisited regularly (judged by their last Git commit or modification time)",
           "oneOf": [
             {
@@ -1267,7 +1267,7 @@
           "rules": {
             "type": "object",
             "properties": {
-              "context/no-missing-path": {
+              "agentfile/no-missing-path": {
                 "description": "Referenced files and directories (in code spans and @imports) must exist",
                 "oneOf": [
                   {
@@ -1421,7 +1421,7 @@
                   }
                 ]
               },
-              "context/no-missing-script": {
+              "agentfile/no-missing-script": {
                 "description": "Documented scripts and tasks (npm/pnpm/yarn/bun/deno, make, just, task, poetry/uv/pdm/hatch/tox/nox, maven, gradle, composer, cargo) must exist",
                 "oneOf": [
                   {
@@ -1619,7 +1619,7 @@
                   }
                 ]
               },
-              "context/no-broken-reference": {
+              "agentfile/no-broken-reference": {
                 "description": "Relative Markdown links, images, local #anchors and #L42 line fragments must resolve",
                 "oneOf": [
                   {
@@ -1773,7 +1773,7 @@
                   }
                 ]
               },
-              "context/no-agent-files-drift": {
+              "agentfile/no-agent-files-drift": {
                 "description": "AGENTS.md, CLAUDE.md, GEMINI.md, ... in the same directory must be identical or symlinked",
                 "oneOf": [
                   {
@@ -1919,7 +1919,7 @@
                   }
                 ]
               },
-              "context/no-invalid-skill": {
+              "agentfile/no-invalid-skill": {
                 "description": "Skill directories must have a valid layout and SKILL.md files valid frontmatter",
                 "oneOf": [
                   {
@@ -2065,7 +2065,7 @@
                   }
                 ]
               },
-              "context/no-misnamed-agent-file": {
+              "agentfile/no-misnamed-agent-file": {
                 "description": "AGENTS.md, CLAUDE.md, ... must be named in the exact case agents look for",
                 "oneOf": [
                   {
@@ -2177,7 +2177,7 @@
                   }
                 ]
               },
-              "context/no-unnecessary-agent-files": {
+              "agentfile/no-unnecessary-agent-files": {
                 "description": "CLAUDE.md must not merely mirror AGENTS.md, which Claude Code reads itself",
                 "oneOf": [
                   {
@@ -2289,7 +2289,7 @@
                   }
                 ]
               },
-              "context/keep-agents-file-up-to-date": {
+              "agentfile/keep-agents-file-up-to-date": {
                 "description": "Context files must be revisited regularly (judged by their last Git commit or modification time)",
                 "oneOf": [
                   {

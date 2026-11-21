@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { makeProject, messages, runRule } from "#test/helpers.ts";
 
-const RULE = "context/no-missing-script";
+const RULE = "agentfile/no-missing-script";
 
 describe("deno task", () => {
   test("checks deno.json(c) tasks and package.json scripts", async () => {

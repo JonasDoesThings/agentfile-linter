@@ -298,7 +298,7 @@ export function findImports(text: string): { path: string; index: number }[] {
 
 export const noMissingPath: Rule<NoMissingPathOptions> = {
   meta: {
-    name: "context/no-missing-path",
+    name: "agentfile/no-missing-path",
     description: "Referenced files and directories (in code spans and @imports) must exist",
     categories: ["recommended"],
     defaultSeverity: "error",
@@ -330,7 +330,7 @@ export const noMissingPath: Rule<NoMissingPathOptions> = {
     let exampleFiles: Set<string> | undefined;
 
     visit(file.ast, "inlineCode", (node, ancestors) => {
-      if (insideLink(ancestors)) return; // covered by context/no-broken-reference
+      if (insideLink(ancestors)) return; // covered by agentfile/no-broken-reference
       const candidate = classifyPathCandidate(node.value);
       if (!candidate || isIgnoredByOption(candidate.path) || isIgnoredByOption(node.value.trim())) return;
       exampleFiles ??= exampleFilesFromCodeFences(file.ast);

@@ -78,10 +78,10 @@ describe("file discovery", () => {
     expect(result.files.map((f) => f.filePath.slice(root.length + 1))).toEqual(["ignored/AGENTS.md"]);
   });
 
-  test("ignorePatterns, --ignore-pattern and .contextlintignore", async () => {
+  test("ignorePatterns, --ignore-pattern and .agentfile-linterignore", async () => {
     const root = makeProject({
-      ".contextlintrc.json": { ignorePatterns: ["vendor/"] },
-      ".contextlintignore": "# comment\nlegacy/\n",
+      ".agentfile-linterrc.json": { ignorePatterns: ["vendor/"] },
+      ".agentfile-linterignore": "# comment\nlegacy/\n",
       "vendor/AGENTS.md": "",
       "legacy/AGENTS.md": "",
       "tmp/AGENTS.md": "",
@@ -163,17 +163,17 @@ describe("inline suppressions", () => {
   test("disable-next-line, disable-line, and disable/enable ranges", async () => {
     const root = makeProject({
       "AGENTS.md": [
-        "<!-- contextlint-disable-next-line context/no-missing-path -->",
+        "<!-- agentfile-linter-disable-next-line agentfile/no-missing-path -->",
         "`a.ts`",
-        "`b.ts` <!-- contextlint-disable-line -->",
-        "`c.ts` <!-- contextlint-disable-line no-broken-reference -->",
+        "`b.ts` <!-- agentfile-linter-disable-line -->",
+        "`c.ts` <!-- agentfile-linter-disable-line no-broken-reference -->",
         "",
-        "<!-- contextlint-disable no-missing-path -- generated section -->",
+        "<!-- agentfile-linter-disable no-missing-path -- generated section -->",
         "`d.ts`",
-        "<!-- contextlint-enable no-missing-path -->",
+        "<!-- agentfile-linter-enable no-missing-path -->",
         "`e.ts`",
         "",
-        "<!-- contextlint-disable -->",
+        "<!-- agentfile-linter-disable -->",
         "`f.ts`",
         "",
       ].join("\n"),
@@ -188,18 +188,18 @@ describe("inline suppressions", () => {
     const root = makeProject({
       "AGENTS.md": [
         "---",
-        "# contextlint-disable-line no-missing-pth, context/no-missing-path",
+        "# agentfile-linter-disable-line no-missing-pth, agentfile/no-missing-path",
         "---",
-        "<!-- contextlint-disable-next-line no-mising-coasfasas -->",
-        "`a.ts` <!-- contextlint-disable-line context/no-missing-path no-broken-reference -- because -->",
+        "<!-- agentfile-linter-disable-next-line no-mising-coasfasas -->",
+        "`a.ts` <!-- agentfile-linter-disable-line agentfile/no-missing-path no-broken-reference -- because -->",
         "",
-        "> <!-- contextlint-disable no-missing-path,nope -->",
+        "> <!-- agentfile-linter-disable no-missing-path,nope -->",
         "",
         "- item",
-        "  <!-- contextlint-enable",
+        "  <!-- agentfile-linter-enable",
         "  no-missing-path typo -->",
         "",
-        "`b.ts` <!-- contextlint-disable-line no-missing-path missing file -->",
+        "`b.ts` <!-- agentfile-linter-disable-line no-missing-path missing file -->",
         "",
       ].join("\n"),
     });
@@ -212,27 +212,27 @@ describe("inline suppressions", () => {
       severity,
       rule,
     }));
-    const other = expect.stringContaining("`contextlint --rules` lists all rules");
+    const other = expect.stringContaining("`agentfile-linter --rules` lists all rules");
     expect(notes).toEqual([
       {
-        at: "2:28",
-        message: "Unknown rule `no-missing-pth` in `contextlint-disable-line` directive",
-        help: "Did you mean `context/no-missing-path`?",
+        at: "2:33",
+        message: "Unknown rule `no-missing-pth` in `agentfile-linter-disable-line` directive",
+        help: "Did you mean `agentfile/no-missing-path`?",
         severity: "info",
         rule: null,
       },
       {
-        at: "4:36",
-        message: "Unknown rule `no-mising-coasfasas` in `contextlint-disable-next-line` directive",
+        at: "4:41",
+        message: "Unknown rule `no-mising-coasfasas` in `agentfile-linter-disable-next-line` directive",
         help: other,
         severity: "info",
         rule: null,
       },
-      { at: "7:44", message: expect.stringContaining("`nope`"), help: other, severity: "info", rule: null },
+      { at: "7:49", message: expect.stringContaining("`nope`"), help: other, severity: "info", rule: null },
       { at: "11:19", message: expect.stringContaining("`typo`"), help: other, severity: "info", rule: null },
       // Without ` -- `, a reason is read as rule names.
-      { at: "13:54", message: expect.stringContaining("`missing`"), help: other, severity: "info", rule: null },
-      { at: "13:62", message: expect.stringContaining("`file`"), help: other, severity: "info", rule: null },
+      { at: "13:59", message: expect.stringContaining("`missing`"), help: other, severity: "info", rule: null },
+      { at: "13:67", message: expect.stringContaining("`file`"), help: other, severity: "info", rule: null },
     ]);
   });
 
@@ -241,26 +241,26 @@ describe("inline suppressions", () => {
       "AGENTS.md": "",
       ".agents/skills/demo/SKILL.md": [
         "---",
-        "# contextlint-disable-next-line no-invalid-skil",
+        "# agentfile-linter-disable-next-line no-invalid-skil",
         "name: demo",
         "description: Does the thing. Use when the user asks for it.",
         "---",
         "",
       ].join("\n"),
       ".agents/skills/body/SKILL.md":
-        "---\nname: body\ndescription: Does the thing. Use when the user asks for it.\n---\n\n<!-- contextlint-disable typo -->\n",
+        "---\nname: body\ndescription: Does the thing. Use when the user asks for it.\n---\n\n<!-- agentfile-linter-disable typo -->\n",
     });
     // Skills are only scanned where the rule that checks them is on.
     const ruleFlags = [{ severity: "off" as const, target: "no-invalid-skill" }];
     expect(await run(root, { config: false, ruleFlags })).toEqual([]);
     expect(await run(root, { config: false })).toEqual([
-      expect.objectContaining({ file: ".agents/skills/body/SKILL.md", line: 6, column: 26, severity: "info" }),
+      expect.objectContaining({ file: ".agents/skills/body/SKILL.md", line: 6, column: 31, severity: "info" }),
       expect.objectContaining({
         file: ".agents/skills/demo/SKILL.md",
         line: 2,
-        column: 33,
+        column: 38,
         severity: "info",
-        help: "Did you mean `context/no-invalid-skill`?",
+        help: "Did you mean `agentfile/no-invalid-skill`?",
       }),
     ]);
   });

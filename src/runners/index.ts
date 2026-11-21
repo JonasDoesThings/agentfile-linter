@@ -16,7 +16,7 @@ import { executableName } from "./util.ts";
 
 export type { Problem, TaskRunner } from "./types.ts";
 
-/** All task runners known to `context/no-missing-script`. */
+/** All task runners known to `agentfile/no-missing-script`. */
 export const RUNNERS: readonly TaskRunner[] = [
   ...nodeRunners,
   denoRunner,

@@ -211,7 +211,7 @@ function subtreeIsClear(project: Project, dir: string, candidates: ReadonlyMap<s
 
 export const noUnnecessaryAgentFiles: Rule = {
   meta: {
-    name: "context/no-unnecessary-agent-files",
+    name: "agentfile/no-unnecessary-agent-files",
     description: "CLAUDE.md must not merely mirror AGENTS.md, which Claude Code reads itself",
     categories: [],
     defaultSeverity: "warn",

@@ -16,8 +16,8 @@ const INIT_CONFIG = `{
   "categories": {
     "recommended": "error"
   },
-  // Per-rule overrides, e.g. "context/no-missing-script": "warn"
-  // or with options: "context/no-missing-path": ["error", { "ignore": ["generated/**"] }]
+  // Per-rule overrides, e.g. "agentfile/no-missing-script": "warn"
+  // or with options: "agentfile/no-missing-path": ["error", { "ignore": ["generated/**"] }]
   "rules": {},
   // gitignore-style patterns of files that should not be linted
   "ignorePatterns": []
@@ -58,7 +58,7 @@ export async function main(argv: string[]): Promise<number> {
       return 0;
     }
     if (args.version) {
-      out(`contextlint ${pkg.version}\n`);
+      out(`agentfile-linter ${pkg.version}\n`);
       return 0;
     }
     if (args.listRules) {
@@ -129,7 +129,7 @@ export async function main(argv: string[]): Promise<number> {
     return 0;
   } catch (error) {
     if (error instanceof UsageError || error instanceof ConfigError) {
-      err(`contextlint: ${error.message}\n`);
+      err(`agentfile-linter: ${error.message}\n`);
       return 2;
     }
     throw error;

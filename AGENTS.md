@@ -1,4 +1,4 @@
-# contextlint
+# agentfile-linter
 
 A Bun + TypeScript CLI that lints AI agent context files (AGENTS.md, CLAUDE.md, GEMINI.md, …).
 It compiles to a standalone executable with `bun build --compile`. The CLI and config format are
@@ -17,7 +17,7 @@ modeled on oxlint. See [README.md](README.md) for user-facing behavior.
   imports). `bun run fmt:check` only checks.
 - `bun run check` runs formatting check, lint, typecheck, tests and self-lint. Run it before
   finishing a change.
-- `bun run build` builds `dist/contextlint`. `bun run build:all` cross-compiles for every target.
+- `bun run build` builds `dist/agentfile-linter`. `bun run build:all` cross-compiles for every target.
 - `bun run schema` regenerates `configuration_schema.json`. A test fails if the file is stale.
 - `bun run lint:self` lints this repository with itself.
 
@@ -28,7 +28,7 @@ modeled on oxlint. See [README.md](README.md) for user-facing behavior.
   imports.
 - Rules must be deterministic and must not touch the network: results depend only on the linted
   files, their Git history and the config, never on the environment or files outside the
-  project. The one exception is `context/keep-agents-file-up-to-date`, which compares dates with
+  project. The one exception is `agentfile/keep-agents-file-up-to-date`, which compares dates with
   the current time. Prefer false negatives over false positives. When a heuristic is unsure, skip
   the check.
 
@@ -49,7 +49,7 @@ modeled on oxlint. See [README.md](README.md) for user-facing behavior.
 - `src/git.ts`: Git queries (last commit time, uncommitted changes) with a process limit.
 - `src/rules/`: one file per rule, plus its `<rule>.test.ts`. Rules are registered in
   `src/rules/index.ts`.
-- `src/runners/`: task runners used by `context/no-missing-script`, one module per ecosystem
+- `src/runners/`: task runners used by `agentfile/no-missing-script`, one module per ecosystem
   (`node`, `deno`, `make`, `just`, `task`, `python`, `jvm`, `composer`, `cargo`), each with its
   tests. They are registered in `src/runners/index.ts`. Shared helpers (`parseArgs`,
   `notDefined`) are in `src/runners/util.ts`.
@@ -57,7 +57,7 @@ modeled on oxlint. See [README.md](README.md) for user-facing behavior.
 
 ## Adding a rule
 
-1. Create `src/rules/<name>.ts` exporting a `Rule` with `meta` (name `context/<name>`,
+1. Create `src/rules/<name>.ts` exporting a `Rule` with `meta` (name `agentfile/<name>`,
    `categories`, `defaultSeverity`, option `schema`), `defaultOptions` and `check()`. Rules
    about things other than context files (such as skill directories) implement `checkTree()`
    instead. It runs once per lint run and reports by path. Rules with no category are off by

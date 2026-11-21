@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "contextlint",
+      "name": "agentfile-linter",
       "dependencies": {
         "github-slugger": "^2.0.0",
         "ignore": "^7.0.16",

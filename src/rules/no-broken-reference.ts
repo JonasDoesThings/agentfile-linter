@@ -44,7 +44,7 @@ function parseLineFragment(fragment: string): LineRange | null {
 
 export const noBrokenReference: Rule<NoBrokenReferenceOptions> = {
   meta: {
-    name: "context/no-broken-reference",
+    name: "agentfile/no-broken-reference",
     description: "Relative Markdown links, images, local #anchors and #L42 line fragments must resolve",
     categories: ["recommended"],
     defaultSeverity: "error",

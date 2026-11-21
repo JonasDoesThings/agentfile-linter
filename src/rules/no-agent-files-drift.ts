@@ -74,7 +74,7 @@ function resolveEffective(
 
 export const noAgentFilesDrift: Rule<NoAgentFilesDriftOptions> = {
   meta: {
-    name: "context/no-agent-files-drift",
+    name: "agentfile/no-agent-files-drift",
     description: "AGENTS.md, CLAUDE.md, GEMINI.md, ... in the same directory must be identical or symlinked",
     categories: ["recommended"],
     defaultSeverity: "error",
@@ -113,7 +113,7 @@ export const noAgentFilesDrift: Rule<NoAgentFilesDriftOptions> = {
       });
       return;
     }
-    if ("unresolved" in self) return; // broken import: reported by context/no-missing-path
+    if ("unresolved" in self) return; // broken import: reported by agentfile/no-missing-path
 
     let canonical: { name: string; value: Effective } | undefined;
     for (const member of members) {

@@ -24,9 +24,9 @@ export const RULES: ReadonlyMap<string, AnyRule> = new Map(
   ].map((rule) => [rule.meta.name, rule]),
 );
 
-export const RULE_PREFIX = "context/";
+export const RULE_PREFIX = "agentfile/";
 
-/** Resolves `no-missing-path` or `context/no-missing-path` to the canonical rule name. */
+/** Resolves `no-missing-path` or `agentfile/no-missing-path` to the canonical rule name. */
 export function resolveRuleName(name: string): string | undefined {
   if (RULES.has(name)) return name;
   const prefixed = `${RULE_PREFIX}${name}`;

@@ -8,7 +8,7 @@ import { validate } from "./schema.ts";
 import { type AnyRule, CATEGORIES, type Category, DEFAULT_FILE_PATTERNS, type Severity } from "./types.ts";
 import { isRecord } from "./util.ts";
 
-export const CONFIG_FILE_NAMES = [".contextlintrc.json", ".contextlintrc.jsonc"];
+export const CONFIG_FILE_NAMES = [".agentfile-linterrc.json", ".agentfile-linterrc.jsonc"];
 
 /** Context files linted when the config doesn't specify `files`. */
 export { DEFAULT_FILE_PATTERNS };

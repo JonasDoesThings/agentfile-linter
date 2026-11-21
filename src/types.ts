@@ -23,7 +23,7 @@ export type Category = (typeof CATEGORIES)[number];
 export const DEFAULT_FILE_PATTERNS = ["AGENTS.md", "AGENT.md", "CLAUDE.md", "CLAUDE.local.md", "GEMINI.md"];
 
 export interface RuleMeta {
-  /** Fully qualified rule name, e.g. `context/no-missing-path`. */
+  /** Fully qualified rule name, e.g. `agentfile/no-missing-path`. */
   name: string;
   description: string;
   categories: Category[];

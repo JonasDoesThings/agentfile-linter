@@ -80,7 +80,7 @@ function commandLines(node: InlineCode | Code, file: LintedFile): CommandLine[] 
 
 export const noMissingScript: Rule<NoMissingScriptOptions> = {
   meta: {
-    name: "context/no-missing-script",
+    name: "agentfile/no-missing-script",
     description:
       "Documented scripts and tasks (npm/pnpm/yarn/bun/deno, make, just, task, poetry/uv/pdm/hatch/tox/nox, maven, gradle, composer, cargo) must exist",
     categories: ["recommended"],

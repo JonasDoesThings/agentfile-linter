@@ -29,9 +29,9 @@ function pointsIntoFile(d: Diagnostic): boolean {
   return d.ruleId !== null || d.start.line !== d.end.line || d.start.column !== d.end.column;
 }
 
-/** `context/no-missing-path` -> `context(no-missing-path)` (oxlint style). */
+/** `agentfile/no-missing-path` -> `agentfile(no-missing-path)` (oxlint style). */
 function ruleCode(ruleId: string | null): string {
-  if (!ruleId) return "contextlint";
+  if (!ruleId) return "agentfile-linter";
   const slash = ruleId.indexOf("/");
   return slash === -1 ? ruleId : `${ruleId.slice(0, slash)}(${ruleId.slice(slash + 1)})`;
 }
@@ -168,7 +168,7 @@ function formatGithub(result: LintResult, opts: FormatOptions): string {
         `endLine=${d.end.line}`,
         `col=${d.start.column}`,
         `endColumn=${d.end.column}`,
-        `title=${escapeProperty(d.ruleId ?? "contextlint")}`,
+        `title=${escapeProperty(d.ruleId ?? "agentfile-linter")}`,
       ];
       const message = d.help ? `${d.message}\n${d.help}` : d.message;
       const command = d.severity === "info" ? "notice" : SEVERITY_LABELS[d.severity];
@@ -185,7 +185,7 @@ function formatUnix(result: LintResult, opts: FormatOptions): string {
       const label = SEVERITY_LABELS[d.severity];
       const sev = `${label[0]?.toUpperCase()}${label.slice(1)}`;
       out.push(
-        `${displayPath(opts.cwd, file.filePath)}:${d.start.line}:${d.start.column}: ${d.message} [${sev}/${d.ruleId ?? "contextlint"}]`,
+        `${displayPath(opts.cwd, file.filePath)}:${d.start.line}:${d.start.column}: ${d.message} [${sev}/${d.ruleId ?? "agentfile-linter"}]`,
       );
     }
   }

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { makeProject, messages, runRule } from "#test/helpers.ts";
 
-const RULE = "context/no-missing-script";
+const RULE = "agentfile/no-missing-script";
 
 const ROOT_POM = `<project>
   <artifactId>parent</artifactId>

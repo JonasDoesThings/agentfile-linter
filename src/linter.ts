@@ -30,7 +30,7 @@ import type {
   TreeInput,
 } from "./types.ts";
 
-export const DEFAULT_IGNORE_FILE = ".contextlintignore";
+export const DEFAULT_IGNORE_FILE = ".agentfile-linterignore";
 
 export interface LintOptions {
   /** Working directory (defaults to `process.cwd()`). */
@@ -43,7 +43,7 @@ export interface LintOptions {
   ruleFlags?: CliRuleFlag[];
   /** Additional gitignore-style patterns (relative to cwd). */
   ignorePatterns?: string[];
-  /** Ignore file (defaults to `.contextlintignore` in cwd, if present). */
+  /** Ignore file (defaults to `.agentfile-linterignore` in cwd, if present). */
   ignorePath?: string;
   /** Disable .gitignore, ignore files and ignore patterns. */
   noIgnore?: boolean;
@@ -87,14 +87,14 @@ function fileDiagnostic(filePath: string, message: string, severity: Diagnostic[
 /** Inline directives by real path, shared by the per-file and tree passes so that each file is parsed once. */
 type DirectiveCache = Map<string, Directive[]>;
 
-/** Directives of a file the per-file pass didn't parse. Only files that mention `contextlint-` are parsed. */
+/** Directives of a file the per-file pass didn't parse. Only files that mention `agentfile-linter-` are parsed. */
 function treeFileDirectives(path: string, realPath: string, registry: ProjectRegistry, cache: DirectiveCache) {
   let directives = cache.get(realPath);
   if (!directives) {
     const project = registry.forDirectory(dirname(path));
     const text = project.isFile(path) ? project.readText(path) : null;
     directives =
-      text === null || !text.includes("contextlint-") ? [] : collectDirectives({ text, ast: parseMarkdown(text) });
+      text === null || !text.includes("agentfile-linter-") ? [] : collectDirectives({ text, ast: parseMarkdown(text) });
     cache.set(realPath, directives);
   }
   return directives;

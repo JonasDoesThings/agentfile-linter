@@ -2,9 +2,9 @@ import { describe, expect, test } from "bun:test";
 
 import { makeProject, messages, run, runRule } from "#test/helpers.ts";
 
-const RULE = "context/no-broken-reference";
+const RULE = "agentfile/no-broken-reference";
 
-describe("context/no-broken-reference", () => {
+describe("agentfile/no-broken-reference", () => {
   test("checks relative links, images and definitions", async () => {
     const root = makeProject({
       "docs/guide.md": "# Guide\n",
@@ -37,12 +37,12 @@ describe("context/no-broken-reference", () => {
   test("checks local anchors with GitHub slugs", async () => {
     const root = makeProject({
       "AGENTS.md": [
-        "# Project `contextlint` & Co.",
+        "# Project `agentfile-linter` & Co.",
         "## Setup",
         "## Setup",
         '<a id="custom"></a>',
         "",
-        "[a](#project-contextlint--co) [b](#setup-1) [c](#Setup) [d](#custom) [e](#top) [f](#nope)",
+        "[a](#project-agentfile-linter--co) [b](#setup-1) [c](#Setup) [d](#custom) [e](#top) [f](#nope)",
         "",
       ].join("\n"),
     });
@@ -121,7 +121,7 @@ describe("context/no-broken-reference", () => {
       "docs/guide.md": "# Guide\n\n## L9\n",
       "src/a.ts": "",
       "AGENTS.md": "[a](docs/guide.md#L4) [b](docs/guide.md#L9) [c](#L1) [d](src/a.ts#L10) [e](?plain=1#L9)\n",
-      ".contextlintrc.json": { rules: { [RULE]: ["error", { checkLines: false }] } },
+      ".agentfile-linterrc.json": { rules: { [RULE]: ["error", { checkLines: false }] } },
     });
     expect(messages(await run(root))).toEqual([
       "Anchor `#L4` does not match any heading in `docs/guide.md`",
@@ -132,7 +132,7 @@ describe("context/no-broken-reference", () => {
   test("checks line fragments in a non-Markdown context file itself", async () => {
     const root = makeProject({
       ".cursorrules": "[a](#L1) [b](#L2)\n",
-      ".contextlintrc.json": { files: [".cursorrules"] },
+      ".agentfile-linterrc.json": { files: [".cursorrules"] },
     });
     expect(messages(await run(root))).toEqual(["Line `#L2` is out of range: this file has 1 line"]);
   });
@@ -184,7 +184,7 @@ describe("context/no-broken-reference", () => {
       ".gitignore": "coverage/\n",
       "src/a.ts": "",
       "AGENTS.md": "[cov](coverage/index.html) [gen](generated/api.md) [anchor](#nope) [line](src/a.ts#L10)\n",
-      ".contextlintrc.json": {
+      ".agentfile-linterrc.json": {
         rules: { [RULE]: ["error", { ignore: ["generated/**"], checkAnchors: false, checkLines: false }] },
       },
     });

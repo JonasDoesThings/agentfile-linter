@@ -4,7 +4,7 @@ import { makeProject, messages, run, runRule } from "#test/helpers.ts";
 
 import { classifyPathCandidate, findImports } from "./no-missing-path.ts";
 
-const RULE = "context/no-missing-path";
+const RULE = "agentfile/no-missing-path";
 
 describe("classifyPathCandidate", () => {
   test.each([
@@ -73,7 +73,7 @@ describe("findImports", () => {
   });
 });
 
-describe("context/no-missing-path", () => {
+describe("agentfile/no-missing-path", () => {
   test("reports missing files and directories, accepts existing ones", async () => {
     const root = makeProject({
       "src/index.ts": "",
@@ -117,7 +117,7 @@ describe("context/no-missing-path", () => {
     const strict = makeProject({
       "apps/web/src/components/Button.tsx": "",
       "AGENTS.md": "`components/Button.tsx`\n",
-      ".contextlintrc.json": { rules: { [RULE]: ["error", { allowSuffixMatch: false }] } },
+      ".agentfile-linterrc.json": { rules: { [RULE]: ["error", { allowSuffixMatch: false }] } },
     });
     const diagnostics = await run(strict, { ruleFlags: [{ severity: "off", target: "no-missing-script" }] });
     expect(messages(diagnostics)).toEqual(["Path `components/Button.tsx` does not exist"]);
@@ -244,7 +244,7 @@ describe("context/no-missing-path", () => {
   test("checkImports: false disables import checks", async () => {
     const root = makeProject({
       "CLAUDE.md": "@docs/missing.md\n",
-      ".contextlintrc.json": { rules: { [RULE]: ["error", { checkImports: false }] } },
+      ".agentfile-linterrc.json": { rules: { [RULE]: ["error", { checkImports: false }] } },
     });
     expect(await run(root)).toEqual([]);
   });
@@ -252,7 +252,7 @@ describe("context/no-missing-path", () => {
   test("ignore option skips matching paths", async () => {
     const root = makeProject({
       "AGENTS.md": "`generated/client.ts` and `src/missing.ts`\n",
-      ".contextlintrc.json": { rules: { [RULE]: ["error", { ignore: ["generated/**"] }] } },
+      ".agentfile-linterrc.json": { rules: { [RULE]: ["error", { ignore: ["generated/**"] }] } },
     });
     expect(messages(await run(root))).toEqual(["Path `src/missing.ts` does not exist"]);
   });

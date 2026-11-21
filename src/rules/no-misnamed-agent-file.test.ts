@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { collectFiles, lint } from "#src/linter.ts";
 import { makeProject, run, runRule } from "#test/helpers.ts";
 
-const RULE = "context/no-misnamed-agent-file";
+const RULE = "agentfile/no-misnamed-agent-file";
 const CONTENT = "# Instructions\n\nUse pnpm.\n";
 const SKILL = "---\nname: review\ndescription: Reviews code. Use when asked for a review.\n---\n# Review\n";
 
@@ -15,7 +15,7 @@ const summary = async (root: string, options: Parameters<typeof runRule>[2] = {}
 
 /** Whether the temp directory's file system ignores case (the macOS and Windows default). */
 function isCaseInsensitive(): boolean {
-  const dir = mkdtempSync(join(tmpdir(), "contextlint-case-"));
+  const dir = mkdtempSync(join(tmpdir(), "agentfile-linter-case-"));
   try {
     writeFileSync(join(dir, "probe"), "");
     return existsSync(join(dir, "PROBE"));
@@ -24,7 +24,7 @@ function isCaseInsensitive(): boolean {
   }
 }
 
-describe("context/no-misnamed-agent-file", () => {
+describe("agentfile/no-misnamed-agent-file", () => {
   test("differently cased agent files in the project root", async () => {
     const root = makeProject({
       "agents.md": CONTENT,
@@ -133,16 +133,16 @@ describe("context/no-misnamed-agent-file", () => {
 
   test("names matching the configured context file patterns are context files", async () => {
     const root = makeProject({
-      ".contextlintrc.json": { files: ["AGENTS.md", "agents.md"] },
+      ".agentfile-linterrc.json": { files: ["AGENTS.md", "agents.md"] },
       "agents.md": "# Instructions\n\nSee `src/missing.ts`.\n",
       "claude.md": CONTENT,
     });
     expect((await run(root)).map((d) => `${d.rule} ${d.file}`)).toEqual([
-      "context/no-missing-path agents.md",
+      "agentfile/no-missing-path agents.md",
       `${RULE} claude.md`,
     ]);
     expect((await run(root, { paths: ["agents.md", "claude.md"] })).map((d) => `${d.rule} ${d.file}`)).toEqual([
-      "context/no-missing-path agents.md",
+      "agentfile/no-missing-path agents.md",
       `${RULE} claude.md`,
     ]);
   });
@@ -160,18 +160,18 @@ describe("context/no-misnamed-agent-file", () => {
     const diagnostics = await run(root, { config: false });
     expect(
       diagnostics.filter((d) => d.message.includes("must be named exactly")).map((d) => `${d.rule} ${d.file}`),
-    ).toEqual(["context/no-invalid-skill .claude/skills/deploy/skill.md"]);
+    ).toEqual(["agentfile/no-invalid-skill .claude/skills/deploy/skill.md"]);
   });
 
   test("a named, wrongly cased SKILL.md is only checked by no-invalid-skill", async () => {
     const root = makeProject({ ".claude/skills/deploy/skill.md": `${SKILL}\nSee \`src/missing.ts\`.\n` });
     const paths = [".claude/skills/deploy/skill.md"];
     expect((await run(root, { config: false, paths })).map((d) => `${d.rule} ${d.message}`)).toEqual([
-      "context/no-invalid-skill `skill.md` must be named exactly `SKILL.md`",
+      "agentfile/no-invalid-skill `skill.md` must be named exactly `SKILL.md`",
     ]);
     const ruleFlags = [{ severity: "off", target: "no-invalid-skill" } as const];
     expect((await run(root, { config: false, paths, ruleFlags })).map((d) => d.message)).toEqual([
-      "File skipped because `context/no-invalid-skill` is off for it",
+      "File skipped because `agentfile/no-invalid-skill` is off for it",
     ]);
   });
 
@@ -213,14 +213,14 @@ describe("context/no-misnamed-agent-file", () => {
 
   test("lint scope, overrides and inline directives apply", async () => {
     const root = makeProject({
-      ".contextlintrc.json": { overrides: [{ files: ["legacy/**"], rules: { [RULE]: "off" } }] },
+      ".agentfile-linterrc.json": { overrides: [{ files: ["legacy/**"], rules: { [RULE]: "off" } }] },
       "AGENTS.md": CONTENT,
       "app/package.json": { name: "app" },
       "app/claude.md": CONTENT,
       "legacy/package.json": { name: "legacy" },
       "legacy/claude.md": CONTENT,
       "tool/package.json": { name: "tool" },
-      "tool/claude.md": `<!-- contextlint-disable ${RULE} -- read by our own tooling -->\n${CONTENT}`,
+      "tool/claude.md": `<!-- agentfile-linter-disable ${RULE} -- read by our own tooling -->\n${CONTENT}`,
     });
     const files = async (paths?: string[]) => (await run(root, { paths })).map((d) => `${d.rule} ${d.file}`);
     expect(await files()).toEqual([`${RULE} app/claude.md`]);

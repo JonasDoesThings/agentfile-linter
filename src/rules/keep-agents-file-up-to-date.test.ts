@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 import { parseConfig } from "#src/config.ts";
 import { commit, makeProject, messages, run, runGit, runRule } from "#test/helpers.ts";
 
-const RULE = "context/keep-agents-file-up-to-date";
+const RULE = "agentfile/keep-agents-file-up-to-date";
 const CONTENT = "# Agents\n\nUse pnpm.\n";
 
 /** Sets a file's modification time to `days` days ago and returns that date as `YYYY-MM-DD` (UTC). */
@@ -27,10 +27,10 @@ const withFileMode = async (line: string) => {
 };
 
 const withOptions = (options: Record<string, unknown>) => ({
-  ".contextlintrc.json": { categories: { recommended: "off" }, rules: { [RULE]: ["warn", options] } },
+  ".agentfile-linterrc.json": { categories: { recommended: "off" }, rules: { [RULE]: ["warn", options] } },
 });
 
-describe("context/keep-agents-file-up-to-date", () => {
+describe("agentfile/keep-agents-file-up-to-date", () => {
   test("reports files whose last commit is older than 120 days", async () => {
     const root = makeProject({ "AGENTS.md": CONTENT, "packages/a/AGENTS.md": CONTENT });
     commit(root, { daysAgo: 200, paths: ["AGENTS.md"] });

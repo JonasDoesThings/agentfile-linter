@@ -1,9 +1,9 @@
 {
-  "name": "contextlint",
+  "name": "agentfile-linter",
   "version": "0.0.1",
   "description": "Linter for AI agent context files (AGENTS.md, CLAUDE.md, GEMINI.md, ...)",
   "bin": {
-    "contextlint": "./src/cli.ts"
+    "agentfile-linter": "./src/cli.ts"
   },
   "type": "module",
   "imports": {

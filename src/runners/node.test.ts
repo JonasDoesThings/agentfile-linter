@@ -5,7 +5,7 @@ import { makeProject, messages, runRule } from "#test/helpers.ts";
 
 import { parseScriptInvocation } from "./node.ts";
 
-const RULE = "context/no-missing-script";
+const RULE = "agentfile/no-missing-script";
 
 function parse(cmd: string, cwd = "/repo") {
   const tokens = tokenize(cmd);

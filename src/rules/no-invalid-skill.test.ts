@@ -5,7 +5,7 @@ import { format } from "#src/formatters.ts";
 import { collectFiles, lint } from "#src/linter.ts";
 import { makeProject, run, runRule } from "#test/helpers.ts";
 
-const RULE = "context/no-invalid-skill";
+const RULE = "agentfile/no-invalid-skill";
 
 /** A SKILL.md with the given frontmatter lines (`name` defaults to the directory name). */
 const skill = (...frontmatter: string[]) => `---\n${frontmatter.join("\n")}\n---\n\n# Skill\n\nDo the thing.\n`;
@@ -15,7 +15,7 @@ const valid = (name: string, ...extra: string[]) =>
 const summary = async (root: string, options: Parameters<typeof runRule>[2] = {}) =>
   (await runRule(root, RULE, options)).map((d) => `${d.file}:${d.line} ${d.message}`);
 
-describe("context/no-invalid-skill: layout", () => {
+describe("agentfile/no-invalid-skill: layout", () => {
   test("valid skills in all known locations pass", async () => {
     const root = makeProject({
       ".claude/skills/review/SKILL.md": valid(
@@ -230,7 +230,7 @@ describe("context/no-invalid-skill: layout", () => {
     const root = makeProject({
       ".claude/skills/a/SKILL.md": "no frontmatter\n",
       "prompts/skills/b/SKILL.md": "no frontmatter\n",
-      ".contextlintrc.json": { rules: { [RULE]: ["error", { directories: ["prompts/skills"] }] } },
+      ".agentfile-linterrc.json": { rules: { [RULE]: ["error", { directories: ["prompts/skills"] }] } },
     });
     expect((await run(root)).map((d) => d.file)).toEqual(["prompts/skills/b/SKILL.md"]);
   });
@@ -267,7 +267,7 @@ describe("context/no-invalid-skill: layout", () => {
   });
 });
 
-describe("context/no-invalid-skill: frontmatter", () => {
+describe("agentfile/no-invalid-skill: frontmatter", () => {
   test("missing, misplaced and unclosed frontmatter", async () => {
     const root = makeProject({
       ".claude/skills/none/SKILL.md": "# Skill\n",
@@ -419,7 +419,7 @@ describe("context/no-invalid-skill: frontmatter", () => {
       ".claude/skills/b/SKILL.md": skill("name: Other Name"),
       ".claude/skills/c/SKILL.md": skill("description: Uses: colons"),
       ".claude/skills/d/SKILL.md": skill("user-invocable: sometimes"),
-      ".contextlintrc.json": { rules: { [RULE]: ["error", { spec: false }] } },
+      ".agentfile-linterrc.json": { rules: { [RULE]: ["error", { spec: false }] } },
     });
     expect((await run(root)).map((d) => `${d.file}:${d.line} ${d.message}`)).toEqual([
       ".claude/skills/c/SKILL.md:2 Frontmatter is not valid YAML",
@@ -428,7 +428,7 @@ describe("context/no-invalid-skill: frontmatter", () => {
   });
 });
 
-describe("context/no-invalid-skill: configuration and output", () => {
+describe("agentfile/no-invalid-skill: configuration and output", () => {
   test("is recommended and reports errors", async () => {
     const root = makeProject({ ".claude/skills/a/SKILL.md": "# No frontmatter\n" });
     expect((await run(root)).map((d) => [d.rule, d.severity])).toEqual([[RULE, "error"]]);
@@ -439,7 +439,7 @@ describe("context/no-invalid-skill: configuration and output", () => {
       ".claude/skills/legacy/SKILL.md": "# No frontmatter\n",
       ".claude/skills/loose/SKILL.md": skill("description: Loose."),
       ".claude/skills/strict/SKILL.md": skill("description: Strict."),
-      ".contextlintrc.json": {
+      ".agentfile-linterrc.json": {
         overrides: [
           { files: [".claude/skills/legacy/**"], rules: { [RULE]: "off" } },
           { files: [".claude/skills/loose/**"], rules: { [RULE]: ["warn", { spec: false }] } },
@@ -456,7 +456,7 @@ describe("context/no-invalid-skill: configuration and output", () => {
       "custom/demo/SKILL.md": "# No frontmatter\n",
       "custom/other/SKILL.md": "# No frontmatter\n",
       "another/demo/SKILL.md": "# No frontmatter\n",
-      ".contextlintrc.json": {
+      ".agentfile-linterrc.json": {
         overrides: [
           { files: ["custom/demo/**"], rules: { [RULE]: ["warn", { directories: ["custom"] }] } },
           { files: ["/another"], rules: { [RULE]: ["error", { directories: ["another"] }] } },
@@ -472,18 +472,21 @@ describe("context/no-invalid-skill: configuration and output", () => {
   test("an override matching only the skills root applies its severity and options to the skills", async () => {
     const override = { files: ["custom"], rules: { [RULE]: ["warn", { directories: ["custom"], spec: false }] } };
     const files = { "custom/a/SKILL.md": "# No frontmatter\n", "custom/b/SKILL.md": "---\nname: b\n" };
-    const root = makeProject({ ...files, ".contextlintrc.json": { overrides: [override] } });
+    const root = makeProject({ ...files, ".agentfile-linterrc.json": { overrides: [override] } });
     expect((await run(root)).map((d) => [d.file, d.severity, d.message])).toEqual([
       ["custom/b/SKILL.md", "warn", "Frontmatter is not closed"],
     ]);
 
     const enabled = makeProject({
       ...files,
-      ".contextlintrc.json": { rules: { [RULE]: "off" }, overrides: [{ ...override, rules: { [RULE]: "warn" } }] },
+      ".agentfile-linterrc.json": { rules: { [RULE]: "off" }, overrides: [{ ...override, rules: { [RULE]: "warn" } }] },
     });
     // Same root-only override, now turning on a rule that is off: without `directories`, `custom` is no skills root.
     expect(await run(enabled)).toEqual([]);
-    const both = makeProject({ ...files, ".contextlintrc.json": { rules: { [RULE]: "off" }, overrides: [override] } });
+    const both = makeProject({
+      ...files,
+      ".agentfile-linterrc.json": { rules: { [RULE]: "off" }, overrides: [override] },
+    });
     expect((await lint({ cwd: both })).fileCount).toBe(2);
     expect((await run(both)).map((d) => [d.file, d.severity])).toEqual([["custom/b/SKILL.md", "warn"]]);
   });
@@ -493,7 +496,7 @@ describe("context/no-invalid-skill: configuration and output", () => {
       ".agents/skills/default/SKILL.md": "# No frontmatter\n",
       "custom/demo/SKILL.md": "# No frontmatter\n",
       "custom/other/SKILL.md": "# No frontmatter\n",
-      ".contextlintrc.json": {
+      ".agentfile-linterrc.json": {
         rules: { [RULE]: ["off", { directories: ["custom"] }] },
         overrides: [{ files: ["custom/demo/SKILL.md", ".agents/skills/default/SKILL.md"], rules: { [RULE]: "warn" } }],
       },
@@ -504,12 +507,12 @@ describe("context/no-invalid-skill: configuration and output", () => {
   test("a SKILL.md that is also linted as a context file gets a single result", async () => {
     const root = makeProject({
       ".claude/skills/a/SKILL.md": `${skill("name: a", "description: A.", "context: thread")}\nSee \`missing.ts\`.\n`,
-      ".contextlintrc.json": { files: ["SKILL.md"] },
+      ".agentfile-linterrc.json": { files: ["SKILL.md"] },
     });
     const result = await lint({ cwd: root });
     expect(result.fileCount).toBe(1);
     expect(result.files.map((f) => [f.filePath.slice(root.length + 1), f.diagnostics.map((d) => d.ruleId)])).toEqual([
-      [".claude/skills/a/SKILL.md", [RULE, "context/no-missing-path"]],
+      [".claude/skills/a/SKILL.md", [RULE, "agentfile/no-missing-path"]],
     ]);
   });
 
@@ -527,7 +530,7 @@ describe("context/no-invalid-skill: configuration and output", () => {
   test("a named SKILL.md is still a skill where the rule is off, and is reported as skipped", async () => {
     const root = makeProject({
       ".claude/skills/foo/SKILL.md": `${skill("name: foo", "description: Foo.")}\nSee \`missing.ts\`.\n`,
-      ".contextlintrc.json": { overrides: [{ files: [".claude/skills/**"], rules: { [RULE]: "off" } }] },
+      ".agentfile-linterrc.json": { overrides: [{ files: [".claude/skills/**"], rules: { [RULE]: "off" } }] },
     });
     const paths = [".claude/skills/foo/SKILL.md"];
     const skipped = {
@@ -569,7 +572,7 @@ describe("context/no-invalid-skill: configuration and output", () => {
 
   test("inline suppressions apply to tree diagnostics and preserve the checked file count", async () => {
     const root = makeProject({
-      ".agents/skills/demo/SKILL.md": `<!-- contextlint-disable ${RULE} -->\n# Demo\n`,
+      ".agents/skills/demo/SKILL.md": `<!-- agentfile-linter-disable ${RULE} -->\n# Demo\n`,
       ".agents/skills/other/SKILL.md": "# No frontmatter\n",
     });
     const result = await lint({ cwd: root });
@@ -580,14 +583,17 @@ describe("context/no-invalid-skill: configuration and output", () => {
   test("frontmatter takes suppressions as YAML comments", async () => {
     const root = makeProject({
       ".agents/skills/next/SKILL.md": skill(
-        `# contextlint-disable-next-line ${RULE} -- legacy name`,
+        `# agentfile-linter-disable-next-line ${RULE} -- legacy name`,
         "name: Next",
         "description: Does the thing.",
         "effort: extreme",
       ),
-      ".agents/skills/same/SKILL.md": skill(`name: Same # contextlint-disable-line ${RULE}`, "description: Does it."),
+      ".agents/skills/same/SKILL.md": skill(
+        `name: Same # agentfile-linter-disable-line ${RULE}`,
+        "description: Does it.",
+      ),
       // A frontmatter `disable` also covers problems reported on the opening `---`.
-      ".agents/skills/block/SKILL.md": skill("# contextlint-disable no-invalid-skill", "name: Block"),
+      ".agents/skills/block/SKILL.md": skill("# agentfile-linter-disable no-invalid-skill", "name: Block"),
     });
     expect(await summary(root)).toEqual([
       ".agents/skills/next/SKILL.md:5 `effort` must be one of `low`, `medium`, `high`, `xhigh`, `max`",
@@ -597,8 +603,8 @@ describe("context/no-invalid-skill: configuration and output", () => {
   test("a frontmatter disable after an enable still applies", async () => {
     const root = makeProject({
       ".agents/skills/order/SKILL.md": skill(
-        "# contextlint-enable",
-        `# contextlint-disable ${RULE}`,
+        "# agentfile-linter-enable",
+        `# agentfile-linter-disable ${RULE}`,
         "name: Bad_Name",
         "description: Does it.",
       ),
@@ -608,12 +614,12 @@ describe("context/no-invalid-skill: configuration and output", () => {
 
   test("a frontmatter disable covers the opening `---`, but not the lines before it", async () => {
     const root = makeProject({
-      ".agents/skills/above/SKILL.md": skill("name: Bad_Name", "description: d", `# contextlint-disable ${RULE}`),
+      ".agents/skills/above/SKILL.md": skill("name: Bad_Name", "description: d", `# agentfile-linter-disable ${RULE}`),
       ".agents/skills/enabled/SKILL.md": skill(
-        `# contextlint-disable ${RULE}`,
-        "# contextlint-enable",
+        `# agentfile-linter-disable ${RULE}`,
+        "# agentfile-linter-enable",
         "name: Bad_Name",
-        `# contextlint-disable ${RULE}`,
+        `# agentfile-linter-disable ${RULE}`,
         "description: d",
       ),
     });
@@ -625,8 +631,8 @@ describe("context/no-invalid-skill: configuration and output", () => {
 
   test("unclosed frontmatter takes suppressions as YAML comments", async () => {
     const root = makeProject({
-      ".agents/skills/open/SKILL.md": `---\n# contextlint-disable ${RULE}\nname: open\n\n# Open\n`,
-      ".agents/skills/heading/SKILL.md": `---\nname: heading\n\n# contextlint-disable ${RULE}\n`,
+      ".agents/skills/open/SKILL.md": `---\n# agentfile-linter-disable ${RULE}\nname: open\n\n# Open\n`,
+      ".agents/skills/heading/SKILL.md": `---\nname: heading\n\n# agentfile-linter-disable ${RULE}\n`,
     });
     expect(await summary(root)).toEqual([".agents/skills/heading/SKILL.md:1 Frontmatter is not closed"]);
   });
@@ -635,8 +641,8 @@ describe("context/no-invalid-skill: configuration and output", () => {
     const root = makeProject({
       ".agents/skills/text/SKILL.md": skill(
         "description: |",
-        "  Never write # contextlint-disable -- it hides problems",
-        'license: "MIT # contextlint-disable"',
+        "  Never write # agentfile-linter-disable -- it hides problems",
+        'license: "MIT # agentfile-linter-disable"',
         "name: Text",
       ),
     });
@@ -648,7 +654,7 @@ describe("context/no-invalid-skill: configuration and output", () => {
   test("diagnostics show the SKILL.md source", async () => {
     const root = makeProject({ ".claude/skills/a/SKILL.md": skill("name: a", "description: Use when: asked") });
     const output = format(await lint({ cwd: root, config: false }), "default", { cwd: root, color: false });
-    expect(output).toContain("× context(no-invalid-skill): Frontmatter is not valid YAML");
+    expect(output).toContain("× agentfile(no-invalid-skill): Frontmatter is not valid YAML");
     expect(output).toContain("╭─[.claude/skills/a/SKILL.md:3:1]");
     expect(output).toContain(" 3 │ description: Use when: asked");
   });

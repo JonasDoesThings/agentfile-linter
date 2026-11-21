@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { makeProject, messages, run, runRule } from "#test/helpers.ts";
 
-const RULE = "context/no-missing-script";
+const RULE = "agentfile/no-missing-script";
 
 const workspace = {
   "package.json": {
@@ -16,7 +16,7 @@ const workspace = {
   "packages/internal/package.json": { name: "@acme/internal", scripts: { secret: "x" } },
 };
 
-describe("context/no-missing-script", () => {
+describe("agentfile/no-missing-script", () => {
   test("tracks `cd` in commands and code blocks", async () => {
     const root = makeProject({
       ...workspace,
@@ -86,7 +86,7 @@ describe("context/no-missing-script", () => {
     const root = makeProject({
       "package.json": {},
       "AGENTS.md": [
-        "<!-- contextlint-disable-next-line no-missing-script -->",
+        "<!-- agentfile-linter-disable-next-line no-missing-script -->",
         "`npm t`",
         "",
         "A mention of test later in the file.",
@@ -146,7 +146,7 @@ describe("context/no-missing-script", () => {
     const root = makeProject({
       ...workspace,
       "AGENTS.md": "`pnpm release:canary` and `pnpm nope`\n",
-      ".contextlintrc.json": { rules: { [RULE]: ["error", { ignore: ["release:*"] }] } },
+      ".agentfile-linterrc.json": { rules: { [RULE]: ["error", { ignore: ["release:*"] }] } },
     });
     expect(messages(await run(root))).toEqual(["Script `nope` is not defined in `package.json`"]);
   });
@@ -156,7 +156,7 @@ describe("context/no-missing-script", () => {
       Makefile: "build:\n\techo\n",
       "AGENTS.md": "`make nope` and `pnpm nope`\n",
       "package.json": { name: "x" },
-      ".contextlintrc.json": { rules: { [RULE]: ["error", { ignoreRunners: ["make"] }] } },
+      ".agentfile-linterrc.json": { rules: { [RULE]: ["error", { ignoreRunners: ["make"] }] } },
     });
     expect(messages(await run(root))).toEqual(["Script `nope` is not defined in `package.json`"]);
   });
@@ -176,7 +176,7 @@ describe("context/no-missing-script", () => {
       justfile: "build:\n  echo\n",
       "pyproject.toml": '[project]\nname = "x"\n[tool.poe.tasks]\nlint = "ruff check"\n',
       "AGENTS.md": "`uv run make nope`, `poetry poe nope`, `uv run just nope` and `uv run unknown`\n",
-      ".contextlintrc.json": { rules: { [RULE]: ["error", { ignoreRunners: ["make", "poe"] }] } },
+      ".agentfile-linterrc.json": { rules: { [RULE]: ["error", { ignoreRunners: ["make", "poe"] }] } },
     });
     expect(messages(await run(root))).toEqual([
       "Just recipe `nope` is not defined in `justfile`",

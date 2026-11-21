@@ -7,7 +7,7 @@ const CLAUDE_FILE = "CLAUDE.md";
 
 /**
  * Correct context file names by their lowercase spelling. A misnamed `SKILL.md` is reported by
- * `context/no-invalid-skill`, which knows where skills are loaded from.
+ * `agentfile/no-invalid-skill`, which knows where skills are loaded from.
  */
 const NAMES = new Map(DEFAULT_FILE_PATTERNS.map((name) => [name.toLowerCase(), name]));
 
@@ -80,7 +80,7 @@ function misnamedAs(ctx: Pick<TreeDiscoveryContext<unknown>, "projectFor" | "isC
 
 export const noMisnamedAgentFile: Rule = {
   meta: {
-    name: "context/no-misnamed-agent-file",
+    name: "agentfile/no-misnamed-agent-file",
     description: "AGENTS.md, CLAUDE.md, ... must be named in the exact case agents look for",
     categories: ["recommended"],
     defaultSeverity: "error",

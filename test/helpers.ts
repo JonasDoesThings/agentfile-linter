@@ -19,7 +19,7 @@ afterAll(() => {
  * JSON, `{ symlink: target }` creates a symlink. A `.git` dir marks the root.
  */
 export function makeProject(files: Record<string, FileSpec>, { git = true } = {}): string {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "contextlint-test-")));
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "agentfile-linter-test-")));
   created.push(root);
   if (git) mkdirSync(join(root, ".git"));
   for (const [path, spec] of Object.entries(files)) {

@@ -137,7 +137,7 @@ export function parseArgs(argv: string[]): CliArgs {
     }
     const long = SHORT[name] ?? name;
     const spec = OPTIONS[long];
-    if (!spec) throw new UsageError(`Unknown option "${name}". Run "contextlint --help" for usage.`);
+    if (!spec) throw new UsageError(`Unknown option "${name}". Run "agentfile-linter --help" for usage.`);
     if (spec.takesValue) {
       const value = inlineValue ?? argv[++i];
       if (value === undefined) throw new UsageError(`Option "${name}" requires a value`);
@@ -150,20 +150,20 @@ export function parseArgs(argv: string[]): CliArgs {
   return args;
 }
 
-export const HELP = `Usage: contextlint [OPTIONS] [PATH]...
+export const HELP = `Usage: agentfile-linter [OPTIONS] [PATH]...
 
 Lints AI agent context files (AGENTS.md, CLAUDE.md, GEMINI.md, ...).
 PATH defaults to the current directory.
 
 Basic Configuration
-  -c, --config=<./.contextlintrc.json>
+  -c, --config=<./.agentfile-linterrc.json>
                           Configuration file (JSON with comments).
-                          Defaults to the nearest .contextlintrc.json(c).
-      --init              Create a .contextlintrc.json in the current directory
+                          Defaults to the nearest .agentfile-linterrc.json(c).
+      --init              Create a .agentfile-linterrc.json in the current directory
 
 Allowing / Denying Multiple Lints
   Accumulated left to right on top of the config, e.g.
-  \`-A all -D no-missing-path\` or \`-W recommended -A context/no-missing-script\`.
+  \`-A all -D no-missing-path\` or \`-W recommended -A agentfile/no-missing-script\`.
   The categories are:
     * recommended - all rules in this release (enabled by default)
     * all         - every rule
@@ -172,7 +172,7 @@ Allowing / Denying Multiple Lints
   -D, --deny=NAME         Report the rule or category as an error
 
 Ignore Files
-      --ignore-path=PATH  Ignore file to use (default: .contextlintignore)
+      --ignore-path=PATH  Ignore file to use (default: .agentfile-linterignore)
       --ignore-pattern=PAT
                           Additional gitignore-style pattern to ignore (repeatable)
       --no-ignore         Disable .gitignore, ignore files and ignore patterns
@@ -195,10 +195,10 @@ Miscellaneous
   -V, --version           Print version
 
 Inline Configuration Comments
-  <!-- contextlint-disable-next-line context/no-missing-path -->
-  <!-- contextlint-disable-line -->
-  <!-- contextlint-disable context/no-missing-script --> ... <!-- contextlint-enable -->
-  # contextlint-disable-next-line context/no-invalid-skill    (in YAML frontmatter)
+  <!-- agentfile-linter-disable-next-line agentfile/no-missing-path -->
+  <!-- agentfile-linter-disable-line -->
+  <!-- agentfile-linter-disable agentfile/no-missing-script --> ... <!-- agentfile-linter-enable -->
+  # agentfile-linter-disable-next-line agentfile/no-invalid-skill    (in YAML frontmatter)
 
 Exit codes: 0 = no errors, 1 = lint errors (or warnings with --deny-warnings /
 --max-warnings), 2 = invalid usage or configuration.

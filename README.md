@@ -1,15 +1,15 @@
-# contextlint
+# agentfile-linter
 
 A linter for AI agent context files: `AGENTS.md`, `CLAUDE.md`, `GEMINI.md` and friends.
 Its rules are deterministic (except the opt-in date check of `keep-agents-file-up-to-date`), and its CLI and config format are modeled on [oxlint](https://oxc.rs/docs/guide/usage/linter/cli.html).
 
 Context files rot fast. A file gets renamed, a script disappears from `package.json`, or someone
-edits `CLAUDE.md` but forgets `AGENTS.md`. The agent then follows stale instructions. contextlint
+edits `CLAUDE.md` but forgets `AGENTS.md`. The agent then follows stale instructions. agentfile-linter
 catches these problems in CI.
 
 ```console
-$ contextlint .
-  × context(no-missing-script): Script `dev` is not defined in `package.json`
+$ agentfile-linter .
+  × agentfile(no-missing-script): Script `dev` is not defined in `package.json`
    ╭─[AGENTS.md:8:41]
  7 │
  8 │ - `pnpm build` builds everything, `pnpm dev` starts the app.
@@ -24,12 +24,12 @@ Finished in 14ms on 3 files with 4 rules.
 
 ## Installation
 
-contextlint is built with [Bun](https://bun.sh) and ships as a single standalone executable.
+agentfile-linter is built with [Bun](https://bun.sh) and ships as a single standalone executable.
 
 ```sh
 bun install
-bun run build                       # -> dist/contextlint (current platform)
-bun run build:all                   # -> dist/contextlint-<os>-<arch> for every supported target
+bun run build                       # -> dist/agentfile-linter (current platform)
+bun run build:all                   # -> dist/agentfile-linter-<os>-<arch> for every supported target
 ```
 
 During development you can also run it from source: `bun run src/cli.ts .`
@@ -37,21 +37,21 @@ During development you can also run it from source: `bun run src/cli.ts .`
 ## Usage
 
 ```sh
-contextlint                         # lint the current directory (same as `contextlint .`)
-contextlint packages/web CLAUDE.md  # lint specific directories or files
-contextlint -A all -D no-missing-path        # run a single rule
-contextlint -W recommended --max-warnings 0  # report everything as warnings, fail on any
-contextlint -f github               # GitHub Actions annotations
-contextlint --rules                 # list rules
-contextlint --init                  # create .contextlintrc.json
-contextlint --debug files           # print the files that would be linted, then exit
+agentfile-linter                         # lint the current directory (same as `agentfile-linter .`)
+agentfile-linter packages/web CLAUDE.md  # lint specific directories or files
+agentfile-linter -A all -D no-missing-path        # run a single rule
+agentfile-linter -W recommended --max-warnings 0  # report everything as warnings, fail on any
+agentfile-linter -f github               # GitHub Actions annotations
+agentfile-linter --rules                 # list rules
+agentfile-linter --init                  # create .agentfile-linterrc.json
+agentfile-linter --debug files           # print the files that would be linted, then exit
 ```
 
 With no config file and no rule flags, every rule in the `recommended` category runs as an `error`.
 
 ### Linted files
 
-By default, contextlint finds these files in every directory: `AGENTS.md`, `AGENT.md`,
+By default, agentfile-linter finds these files in every directory: `AGENTS.md`, `AGENT.md`,
 `CLAUDE.md`, `CLAUDE.local.md` and `GEMINI.md`. `.claude/` and other hidden directories are
 included. Discovery skips `node_modules`, `.git` and everything excluded by `.gitignore`. If one
 file is a symlink to another, it is linted only once.
@@ -60,45 +60,45 @@ Files you name on the command line can have any name and bypass `.gitignore`. A 
 excluded by `ignorePatterns`, `--ignore-pattern`, or the ignore file is skipped with a warning.
 Use `--no-ignore` to lint it.
 
-Besides context files, [`context/no-invalid-skill`](#contextno-invalid-skill) checks the skill
+Besides context files, [`agentfile/no-invalid-skill`](#agentfileno-invalid-skill) checks the skill
 directories (`.claude/skills/`, `.agents/skills/`, …) below the linted directories, with the same
 ignore rules. You can also name a skill directory or its `SKILL.md` directly. A named `SKILL.md`
-is checked only by `context/no-invalid-skill`; where that rule is off, the file is skipped with a
+is checked only by `agentfile/no-invalid-skill`; where that rule is off, the file is skipped with a
 warning. Checked skill files count toward the lint totals.
-[`context/no-misnamed-agent-file`](#contextno-misnamed-agent-file) also looks at the names of the
+[`agentfile/no-misnamed-agent-file`](#agentfileno-misnamed-agent-file) also looks at the names of the
 other files in the linted directories, to find agent files that discovery misses because of their
 case (`agents.md`).
 
 ### Options
 
-| Option                   | Description                                                                                    |
-| ------------------------ | ---------------------------------------------------------------------------------------------- |
-| `-c, --config <path>`    | Config file. Default: nearest `.contextlintrc.json` / `.contextlintrc.jsonc`, searching upward |
-| `--init`                 | Write a starter `.contextlintrc.json`                                                          |
-| `-A, --allow <name>`     | Turn a rule, a category or `all` off                                                           |
-| `-W, --warn <name>`      | Report a rule, a category or `all` as a warning                                                |
-| `-D, --deny <name>`      | Report a rule, a category or `all` as an error                                                 |
-| `--ignore-path <path>`   | Ignore file. Default: `.contextlintignore`                                                     |
-| `--ignore-pattern <pat>` | Extra gitignore-style pattern; can be repeated                                                 |
-| `--no-ignore`            | Disable `.gitignore`, ignore files and ignore patterns                                         |
-| `--quiet`                | Report errors only                                                                             |
-| `--deny-warnings`        | Exit 1 if there are any warnings                                                               |
-| `--max-warnings <n>`     | Exit 1 if there are more than `n` warnings                                                     |
-| `-f, --format <fmt>`     | `default`, `stylish`, `json`, `github` or `unix`                                               |
-| `--silent`               | Print no diagnostics                                                                           |
-| `--print-config`         | Print the effective configuration                                                              |
-| `--debug=<options>`      | Debug output, comma-separated. `files`: print the files that would be linted, then exit        |
-| `--rules`                | List all rules                                                                                 |
+| Option                   | Description                                                                                              |
+| ------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `-c, --config <path>`    | Config file. Default: nearest `.agentfile-linterrc.json` / `.agentfile-linterrc.jsonc`, searching upward |
+| `--init`                 | Write a starter `.agentfile-linterrc.json`                                                               |
+| `-A, --allow <name>`     | Turn a rule, a category or `all` off                                                                     |
+| `-W, --warn <name>`      | Report a rule, a category or `all` as a warning                                                          |
+| `-D, --deny <name>`      | Report a rule, a category or `all` as an error                                                           |
+| `--ignore-path <path>`   | Ignore file. Default: `.agentfile-linterignore`                                                          |
+| `--ignore-pattern <pat>` | Extra gitignore-style pattern; can be repeated                                                           |
+| `--no-ignore`            | Disable `.gitignore`, ignore files and ignore patterns                                                   |
+| `--quiet`                | Report errors only                                                                                       |
+| `--deny-warnings`        | Exit 1 if there are any warnings                                                                         |
+| `--max-warnings <n>`     | Exit 1 if there are more than `n` warnings                                                               |
+| `-f, --format <fmt>`     | `default`, `stylish`, `json`, `github` or `unix`                                                         |
+| `--silent`               | Print no diagnostics                                                                                     |
+| `--print-config`         | Print the effective configuration                                                                        |
+| `--debug=<options>`      | Debug output, comma-separated. `files`: print the files that would be linted, then exit                  |
+| `--rules`                | List all rules                                                                                           |
 
 `-A`/`-W`/`-D` are applied left to right, after the config file. A rule name can be written with
-or without its `context/` prefix.
+or without its `agentfile/` prefix.
 
 **Exit codes:** `0` means no errors. `1` means lint errors were found, or warnings exceeded
 `--deny-warnings` / `--max-warnings`. `2` means invalid usage or configuration.
 
 ## Configuration
 
-`.contextlintrc.json` (comments and trailing commas are allowed):
+`.agentfile-linterrc.json` (comments and trailing commas are allowed):
 
 ```jsonc
 {
@@ -106,8 +106,8 @@ or without its `context/` prefix.
   // Severity for every rule in a category ("off" | "warn" | "error")
   "categories": { "recommended": "error" },
   "rules": {
-    "context/no-missing-path": ["error", { "ignore": ["generated/**"] }],
-    "context/no-missing-script": "warn",
+    "agentfile/no-missing-path": ["error", { "ignore": ["generated/**"] }],
+    "agentfile/no-missing-script": "warn",
   },
   "overrides": [{ "files": ["packages/legacy/**"], "rules": { "no-missing-path": "off" } }],
   "ignorePatterns": ["vendor/"],
@@ -130,51 +130,51 @@ Severities accept `"off"`/`"allow"`/`0`, `"warn"`/`1` and `"error"`/`"deny"`/`2`
 ### Inline suppressions
 
 ```text
-<!-- contextlint-disable-next-line context/no-missing-path -->
+<!-- agentfile-linter-disable-next-line agentfile/no-missing-path -->
 Create `src/new-feature.ts` for the new feature.
 
-`legacy/thing.ts` <!-- contextlint-disable-line -->
+`legacy/thing.ts` <!-- agentfile-linter-disable-line -->
 
-<!-- contextlint-disable no-missing-script -- generated section -->
+<!-- agentfile-linter-disable no-missing-script -- generated section -->
 
 ...
-<!-- contextlint-enable no-missing-script -->
+<!-- agentfile-linter-enable no-missing-script -->
 ```
 
 Frontmatter has to start on the first line, so it takes the same directives as YAML comments. A
-`# contextlint-disable` comment in frontmatter also covers the opening `---`, where problems with
+`# agentfile-linter-disable` comment in frontmatter also covers the opening `---`, where problems with
 the frontmatter as a whole (such as a missing field) are reported.
 
 ```markdown
 ---
-# contextlint-disable-next-line context/no-invalid-skill -- name used by our scripts
+# agentfile-linter-disable-next-line agentfile/no-invalid-skill -- name used by our scripts
 name: Legacy_Deploy
 description: Deploys the app. Use when the user asks for a deployment.
 ---
 ```
 
 A directive with a name that isn't a rule (usually a typo, or a reason without the `--`
-separator) suppresses nothing for that name. contextlint reports each such name as an `info`
+separator) suppresses nothing for that name. agentfile-linter reports each such name as an `info`
 diagnostic, with a suggestion when the name is close to a rule. Infos don't count as warnings or
 errors, so they don't change the exit code, and `--quiet` hides them.
 
 ## Rules
 
-| Rule                                                                         | Category    | Checks                                                                    |
-| ---------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------- |
-| [`context/no-missing-path`](#contextno-missing-path)                         | recommended | Referenced files and directories exist                                    |
-| [`context/no-missing-script`](#contextno-missing-script)                     | recommended | Documented scripts and tasks (npm, make, just, uv, maven, cargo, …) exist |
-| [`context/no-broken-reference`](#contextno-broken-reference)                 | recommended | Relative links, images, `#anchors` and `#L42` line fragments resolve      |
-| [`context/no-agent-files-drift`](#contextno-agent-files-drift)               | recommended | Agent files in one directory are identical or symlinked                   |
-| [`context/no-invalid-skill`](#contextno-invalid-skill)                       | recommended | Skill directories have a valid layout and valid `SKILL.md` frontmatter    |
-| [`context/no-misnamed-agent-file`](#contextno-misnamed-agent-file)           | recommended | Agent files are spelled in the exact case agents look for                 |
-| [`context/no-unnecessary-agent-files`](#contextno-unnecessary-agent-files)   | –           | No `CLAUDE.md` that only mirrors `AGENTS.md`                              |
-| [`context/keep-agents-file-up-to-date`](#contextkeep-agents-file-up-to-date) | –           | Context files were changed recently                                       |
+| Rule                                                                             | Category    | Checks                                                                    |
+| -------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------- |
+| [`agentfile/no-missing-path`](#agentfileno-missing-path)                         | recommended | Referenced files and directories exist                                    |
+| [`agentfile/no-missing-script`](#agentfileno-missing-script)                     | recommended | Documented scripts and tasks (npm, make, just, uv, maven, cargo, …) exist |
+| [`agentfile/no-broken-reference`](#agentfileno-broken-reference)                 | recommended | Relative links, images, `#anchors` and `#L42` line fragments resolve      |
+| [`agentfile/no-agent-files-drift`](#agentfileno-agent-files-drift)               | recommended | Agent files in one directory are identical or symlinked                   |
+| [`agentfile/no-invalid-skill`](#agentfileno-invalid-skill)                       | recommended | Skill directories have a valid layout and valid `SKILL.md` frontmatter    |
+| [`agentfile/no-misnamed-agent-file`](#agentfileno-misnamed-agent-file)           | recommended | Agent files are spelled in the exact case agents look for                 |
+| [`agentfile/no-unnecessary-agent-files`](#agentfileno-unnecessary-agent-files)   | –           | No `CLAUDE.md` that only mirrors `AGENTS.md`                              |
+| [`agentfile/keep-agents-file-up-to-date`](#agentfilekeep-agents-file-up-to-date) | –           | Context files were changed recently                                       |
 
 Rules in the `recommended` category run by default. The others are off until you enable them in
-`rules`, e.g. `"context/keep-agents-file-up-to-date": "warn"`.
+`rules`, e.g. `"agentfile/keep-agents-file-up-to-date": "warn"`.
 
-### `context/no-missing-path`
+### `agentfile/no-missing-path`
 
 Checks inline code spans that look like paths, plus `@path/to/file.md` imports (the import
 syntax of Claude Code and Gemini CLI).
@@ -209,7 +209,7 @@ syntax of Claude Code and Gemini CLI).
 | `allowSuffixMatch` | `true`  | Accept paths that match the end of a project path |
 | `checkImports`     | `true`  | Check `@path` imports                             |
 
-### `context/no-missing-script`
+### `agentfile/no-missing-script`
 
 Finds task-runner commands in inline code and in shell code blocks (`sh`, `bash`, `console`,
 untagged, …). It then checks that the script, target or task exists where the command would
@@ -270,7 +270,7 @@ it is only checked in projects that use go-task or taskipy.
 | `ignore`        | `[]`    | Glob patterns of script, target or task names to skip                                                                                                                                                                                    |
 | `ignoreRunners` | `[]`    | Runners not to check, e.g. `["maven", "gradle"]`. Runner ids: `npm`, `pnpm`, `yarn`, `bun`, `deno`, `make`, `just`, `task`, `poetry`, `uv`, `pdm`, `rye`, `hatch`, `pipenv`, `poe`, `tox`, `nox`, `maven`, `gradle`, `composer`, `cargo` |
 
-### `context/no-broken-reference`
+### `agentfile/no-broken-reference`
 
 Checks relative Markdown links, images, reference definitions and `href`/`src` in inline HTML.
 
@@ -292,7 +292,7 @@ Checks relative Markdown links, images, reference definitions and `href`/`src` i
 | `checkLines`   | `true`  | Check `#L42` line fragments against the file length |
 | `ignore`       | `[]`    | Glob patterns of link targets to skip               |
 
-### `context/no-agent-files-drift`
+### `agentfile/no-agent-files-drift`
 
 The agent files in one directory (`AGENTS.md`, `AGENT.md`, `CLAUDE.md`, `GEMINI.md`) must have
 the same effective content. A file passes when it:
@@ -311,7 +311,7 @@ part of the group.
 | `files`        | `["AGENTS.md", "AGENT.md", "CLAUDE.md", "GEMINI.md"]` | Files that must stay in sync, in order of precedence |
 | `allowImports` | `true`                                                | Accept `@OTHER.md` pointer files                     |
 
-### `context/no-invalid-skill`
+### `agentfile/no-invalid-skill`
 
 Checks [Agent Skills](https://agentskills.io/specification) instead of context files. It looks
 for skills directories below the linted directories: `.claude/skills`, `.agents/skills`,
@@ -368,7 +368,7 @@ all fields as optional, but Codex, GitHub Copilot, Cursor and Gemini CLI need th
 rule for one skill. An override can match the skill file or the skills root; one that matches the
 skills root (`"files": ["custom"]`) applies its severity and all options to every skill in it.
 
-### `context/no-misnamed-agent-file`
+### `agentfile/no-misnamed-agent-file`
 
 Agents look for `AGENTS.md`, `AGENT.md`, `CLAUDE.md`, `CLAUDE.local.md` and `GEMINI.md` by their
 exact name. On case-insensitive file systems (the macOS and Windows default), `agents.md` or
@@ -387,11 +387,11 @@ where the file is silently ignored. This rule reports such files:
 A file is never reported when the correctly named file exists next to it (possible on
 case-sensitive file systems) or when it matches the [`files`](#options) patterns, and git-ignored
 files are skipped unless named on the command line. A `SKILL.md` in the wrong case is reported by
-[`context/no-invalid-skill`](#contextno-invalid-skill). Rename tracked files with
+[`agentfile/no-invalid-skill`](#agentfileno-invalid-skill). Rename tracked files with
 `git mv`: on case-insensitive file systems, Git doesn't notice a plain rename that only changes
 case.
 
-### `context/no-unnecessary-agent-files`
+### `agentfile/no-unnecessary-agent-files`
 
 Off by default. Since v2.1.277, Claude Code reads `AGENTS.md` when there is no `CLAUDE.md`, so one
 `AGENTS.md` can serve all agents. This rule reports a `CLAUDE.md` that only mirrors the
@@ -416,7 +416,7 @@ keeps Claude Code from reading `AGENTS.md` in sessions launched below it.
 Keep the `CLAUDE.md` if your team uses older Claude Code versions or sets "Project instructions"
 to `claude-md` in `/config`.
 
-### `context/keep-agents-file-up-to-date`
+### `agentfile/keep-agents-file-up-to-date`
 
 Off by default. Reports context files that have not changed for more than
 `warnIfNotUpdatedForDays`. Agent instructions go stale as a project changes. Any change, even a
@@ -424,7 +424,7 @@ small one, resets the timer: a commit in Git, otherwise any edit to the file.
 
 ```jsonc
 "rules": {
-  "context/keep-agents-file-up-to-date": ["warn", { "warnIfNotUpdatedForDays": 30, "warnOnlyForFilesLongerThanChars": 20 }],
+  "agentfile/keep-agents-file-up-to-date": ["warn", { "warnIfNotUpdatedForDays": 30, "warnOnlyForFilesLongerThanChars": 20 }],
 }
 ```
 
@@ -456,7 +456,7 @@ small one, resets the timer: a commit in Git, otherwise any edit to the file.
 ## Programmatic API
 
 ```ts
-import { format, lint } from "contextlint/src/index.ts";
+import { format, lint } from "agentfile-linter/src/index.ts";
 
 const result = await lint({ cwd: "/path/to/repo", ruleFlags: [{ severity: "warn", target: "all" }] });
 console.log(format(result, "stylish", { cwd: "/path/to/repo", color: false }));

@@ -4,7 +4,7 @@ import { makeProject, messages, run, runRule } from "#test/helpers.ts";
 
 import { normalizeContent, pointerImports } from "./no-agent-files-drift.ts";
 
-const RULE = "context/no-agent-files-drift";
+const RULE = "agentfile/no-agent-files-drift";
 const CONTENT = "# Agents\n\nUse pnpm.\n\n## Testing\n\nRun tests.\n";
 
 describe("helpers", () => {
@@ -23,7 +23,7 @@ describe("helpers", () => {
   });
 });
 
-describe("context/no-agent-files-drift", () => {
+describe("agentfile/no-agent-files-drift", () => {
   test("identical files pass", async () => {
     const root = makeProject({
       "AGENTS.md": CONTENT,
@@ -40,7 +40,7 @@ describe("context/no-agent-files-drift", () => {
       "GEMINI.md": { symlink: "AGENTS.md" },
     });
     const diagnostics = await run(root);
-    expect(diagnostics.map((d) => [d.file, d.rule])).toEqual([["AGENTS.md", "context/no-missing-path"]]);
+    expect(diagnostics.map((d) => [d.file, d.rule])).toEqual([["AGENTS.md", "agentfile/no-missing-path"]]);
   });
 
   test("reports the first differing line on the non-canonical file", async () => {
@@ -70,7 +70,7 @@ describe("context/no-agent-files-drift", () => {
     const root = makeProject({
       "AGENTS.md": CONTENT,
       "CLAUDE.md": "@AGENTS.md\n",
-      ".contextlintrc.json": { rules: { [RULE]: ["error", { allowImports: false }] } },
+      ".agentfile-linterrc.json": { rules: { [RULE]: ["error", { allowImports: false }] } },
     });
     expect(messages(await run(root))).toEqual([
       "`CLAUDE.md` has drifted from `AGENTS.md` (first difference at line 1)",
@@ -106,7 +106,7 @@ describe("context/no-agent-files-drift", () => {
     const root = makeProject({
       "AGENTS.md": "a\n",
       "CLAUDE.md": "b\n",
-      ".contextlintrc.json": { rules: { [RULE]: ["error", { files: ["AGENTS.md", "GEMINI.md"] }] } },
+      ".agentfile-linterrc.json": { rules: { [RULE]: ["error", { files: ["AGENTS.md", "GEMINI.md"] }] } },
     });
     expect(await run(root, { ruleFlags: [{ severity: "off", target: "no-missing-path" }] })).toEqual([]);
   });
