@@ -1244,6 +1244,156 @@
               "maxItems": 2
             }
           ]
+        },
+        "agentfile/limit-file-size": {
+          "description": "Context files must not be longer than a maximum number of characters",
+          "oneOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "warn",
+                    "error",
+                    "allow",
+                    "deny"
+                  ]
+                },
+                {
+                  "type": "integer",
+                  "enum": [
+                    0,
+                    1,
+                    2
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "warn",
+                        "error",
+                        "allow",
+                        "deny"
+                      ]
+                    },
+                    {
+                      "type": "integer",
+                      "enum": [
+                        0,
+                        1,
+                        2
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "maxChars": {
+                      "description": "Report files with more characters than this. Characters are counted as displayed: an emoji or an accented letter counts once.",
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        {
+                          "type": "string",
+                          "pattern": "^[0-9]+$"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ],
+              "minItems": 1,
+              "maxItems": 2
+            }
+          ]
+        },
+        "limit-file-size": {
+          "description": "Context files must not be longer than a maximum number of characters",
+          "oneOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "warn",
+                    "error",
+                    "allow",
+                    "deny"
+                  ]
+                },
+                {
+                  "type": "integer",
+                  "enum": [
+                    0,
+                    1,
+                    2
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "warn",
+                        "error",
+                        "allow",
+                        "deny"
+                      ]
+                    },
+                    {
+                      "type": "integer",
+                      "enum": [
+                        0,
+                        1,
+                        2
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "maxChars": {
+                      "description": "Report files with more characters than this. Characters are counted as displayed: an emoji or an accented letter counts once.",
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        {
+                          "type": "string",
+                          "pattern": "^[0-9]+$"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ],
+              "minItems": 1,
+              "maxItems": 2
+            }
+          ]
         }
       },
       "additionalProperties": false
@@ -2448,6 +2598,156 @@
                             "anyOf": [
                               {
                                 "type": "number",
+                                "minimum": 0
+                              },
+                              {
+                                "type": "string",
+                                "pattern": "^[0-9]+$"
+                              }
+                            ]
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    ],
+                    "minItems": 1,
+                    "maxItems": 2
+                  }
+                ]
+              },
+              "agentfile/limit-file-size": {
+                "description": "Context files must not be longer than a maximum number of characters",
+                "oneOf": [
+                  {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "warn",
+                          "error",
+                          "allow",
+                          "deny"
+                        ]
+                      },
+                      {
+                        "type": "integer",
+                        "enum": [
+                          0,
+                          1,
+                          2
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "prefixItems": [
+                      {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "off",
+                              "warn",
+                              "error",
+                              "allow",
+                              "deny"
+                            ]
+                          },
+                          {
+                            "type": "integer",
+                            "enum": [
+                              0,
+                              1,
+                              2
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "maxChars": {
+                            "description": "Report files with more characters than this. Characters are counted as displayed: an emoji or an accented letter counts once.",
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              {
+                                "type": "string",
+                                "pattern": "^[0-9]+$"
+                              }
+                            ]
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    ],
+                    "minItems": 1,
+                    "maxItems": 2
+                  }
+                ]
+              },
+              "limit-file-size": {
+                "description": "Context files must not be longer than a maximum number of characters",
+                "oneOf": [
+                  {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "warn",
+                          "error",
+                          "allow",
+                          "deny"
+                        ]
+                      },
+                      {
+                        "type": "integer",
+                        "enum": [
+                          0,
+                          1,
+                          2
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "prefixItems": [
+                      {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "off",
+                              "warn",
+                              "error",
+                              "allow",
+                              "deny"
+                            ]
+                          },
+                          {
+                            "type": "integer",
+                            "enum": [
+                              0,
+                              1,
+                              2
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "maxChars": {
+                            "description": "Report files with more characters than this. Characters are counted as displayed: an emoji or an accented letter counts once.",
+                            "anyOf": [
+                              {
+                                "type": "integer",
                                 "minimum": 0
                               },
                               {

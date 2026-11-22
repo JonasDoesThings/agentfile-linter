@@ -15,6 +15,20 @@ export function firstLineRange(text: string): { start: Position; end: Position }
   return lineRange(splitLines(text, 1), 1);
 }
 
+/** A fixed locale, so that results don't depend on the environment. Grapheme rules are the same in all locales. */
+const graphemes = new Intl.Segmenter("en", { granularity: "grapheme" });
+
+/**
+ * The UTF-16 offsets at which the characters of `text` start, counting characters as they are
+ * displayed: extended grapheme clusters. An accented letter (precomposed or with combining marks), a
+ * CJK character, a flag and an emoji sequence like `👨‍👩‍👧` are one character each, and so is a CRLF
+ * line break. A leading byte order mark is not a character.
+ */
+export function* characterOffsets(text: string): Generator<number> {
+  const bom = text.startsWith("﻿") ? 1 : 0;
+  for (const { index } of graphemes.segment(bom ? text.slice(bom) : text)) yield index + bom;
+}
+
 /** Levenshtein distance between two strings. */
 export function editDistance(a: string, b: string): number {
   let prev = Array.from({ length: b.length + 1 }, (_, i) => i);

@@ -2,6 +2,7 @@ import { closest } from "#src/text.ts";
 import type { AnyRule, Category } from "#src/types.ts";
 
 import { keepAgentsFileUpToDate } from "./keep-agents-file-up-to-date.ts";
+import { limitFileSize } from "./limit-file-size.ts";
 import { noAgentFilesDrift } from "./no-agent-files-drift.ts";
 import { noBrokenReference } from "./no-broken-reference.ts";
 import { noInvalidSkill } from "./no-invalid-skill.ts";
@@ -21,6 +22,7 @@ export const RULES: ReadonlyMap<string, AnyRule> = new Map(
     noMisnamedAgentFile,
     noUnnecessaryAgentFiles,
     keepAgentsFileUpToDate,
+    limitFileSize,
   ].map((rule) => [rule.meta.name, rule]),
 );
 

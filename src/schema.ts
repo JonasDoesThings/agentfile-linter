@@ -7,7 +7,7 @@ import { assertNever } from "./util.ts";
  */
 export type OptionSchema =
   | { type: "boolean"; description?: string; default?: boolean }
-  | { type: "number"; description?: string; minimum?: number; default?: number }
+  | { type: "number" | "integer"; description?: string; minimum?: number; default?: number }
   | { type: "string"; description?: string; enum?: string[]; pattern?: string; default?: string }
   | { type: "array"; description?: string; items: OptionSchema; default?: unknown[] }
   | {
@@ -25,7 +25,10 @@ function expected(schema: OptionSchema): string {
     case "boolean":
       return "a boolean";
     case "number":
-      return schema.minimum === undefined ? "a number" : `a number >= ${schema.minimum}`;
+    case "integer": {
+      const noun = schema.type === "integer" ? "an integer" : "a number";
+      return schema.minimum === undefined ? noun : `${noun} >= ${schema.minimum}`;
+    }
     case "string":
       if (schema.enum) return `one of ${schema.enum.map((v) => JSON.stringify(v)).join(", ")}`;
       return schema.pattern ? `a string matching /${schema.pattern}/` : "a string";
@@ -50,6 +53,9 @@ export function validate(schema: OptionSchema, value: unknown, path = "options")
       return typeof value === "boolean" ? [] : [`${path} must be a boolean`];
     case "number":
       if (typeof value !== "number" || !Number.isFinite(value)) return [`${path} must be a number`];
+      return schema.minimum !== undefined && value < schema.minimum ? [`${path} must be ${expected(schema)}`] : [];
+    case "integer":
+      if (typeof value !== "number" || !Number.isInteger(value)) return [`${path} must be an integer`];
       return schema.minimum !== undefined && value < schema.minimum ? [`${path} must be ${expected(schema)}`] : [];
     case "string":
       if (typeof value !== "string") return [`${path} must be a string`];
@@ -87,6 +93,7 @@ export function toJsonSchema(schema: OptionSchema): Record<string, unknown> {
   switch (schema.type) {
     case "boolean":
     case "number":
+    case "integer":
     case "string":
       return { ...schema };
     case "array":
@@ -100,4 +107,15 @@ export function toJsonSchema(schema: OptionSchema): Record<string, unknown> {
     default:
       return assertNever(schema);
   }
+}
+
+/** A non-negative number (or integer), also accepted as a string of digits (`"30"`). */
+export function countSchema(description: string, type: "number" | "integer" = "number"): OptionSchema {
+  return {
+    description,
+    anyOf: [
+      { type, minimum: 0 },
+      { type: "string", pattern: "^[0-9]+$" },
+    ],
+  };
 }

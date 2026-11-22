@@ -170,6 +170,7 @@ to turn these reports off.
 | [`agentfile/no-misnamed-agent-file`](#agentfileno-misnamed-agent-file)           | recommended | Agent files are spelled in the exact case agents look for                 |
 | [`agentfile/no-unnecessary-agent-files`](#agentfileno-unnecessary-agent-files)   | –           | No `CLAUDE.md` that only mirrors `AGENTS.md`                              |
 | [`agentfile/keep-agents-file-up-to-date`](#agentfilekeep-agents-file-up-to-date) | –           | Context files were changed recently                                       |
+| [`agentfile/limit-file-size`](#agentfilelimit-file-size)                         | –           | Context files stay below a maximum number of characters                   |
 
 Rules in the `recommended` category run by default. The others are off until you enable them in `rules`, e.g. `"agentfile/keep-agents-file-up-to-date": "warn"`.
 
@@ -342,6 +343,27 @@ Off by default. Reports context files that have not changed for more than `warnI
 | --------------------------------- | ------- | --------------------------------------------------------------------------------------------- |
 | `warnIfNotUpdatedForDays`         | `120`   | Report files not changed for more than this many days (a number or a string like `"30"`)      |
 | `warnOnlyForFilesLongerThanChars` | `0`     | Skip files with at most this many characters (ignoring surrounding whitespace), e.g. pointers |
+
+### `agentfile/limit-file-size`
+
+Off by default. Reports context files with more than `maxChars` characters. Agents load these files into every session, so a long file uses up tokens on every task and buries the instructions that matter. Some agents also enforce limits: Codex stops reading `AGENTS.md` files once their combined size reaches 32 KiB (`project_doc_max_bytes`), and Claude Code warns about a `CLAUDE.md` with more than 40,000 characters.
+
+```jsonc
+"rules": {
+  "agentfile/limit-file-size": ["warn", { "maxChars": 10000 }],
+}
+```
+
+- Characters are counted as they are displayed (Unicode grapheme clusters), not as bytes or UTF-16 code units: `é`, `日`, `👍🏽`, `🇦🇹` and `👨‍👩‍👧` count as one character each, whether a letter is precomposed or written with combining marks. A CRLF line break counts as one character, like LF, and a byte order mark doesn't count. Everything else counts, including whitespace, Markdown syntax, comments and frontmatter, since agents read them too.
+- Characters are a model-independent stand-in for tokens. English text averages about 4 characters per token; Chinese, Japanese and Korean text uses more tokens per character, so consider a lower limit for such files.
+- Each file is measured on its own: files it imports (`@path`) and context files in parent directories are not added.
+- The problem is reported at the first character past the limit. Use [`overrides`](#configuration) to allow more characters in specific files.
+
+| Option     | Default | Description                                                                         |
+| ---------- | ------- | ----------------------------------------------------------------------------------- |
+| `maxChars` | `20000` | Report files with more characters than this (an integer or a string like `"20000"`) |
+
+The default is about 5,000 tokens of English text. It leaves room for the `AGENTS.md` files of parent directories within Codex's 32 KiB.
 
 ## Programmatic API
 

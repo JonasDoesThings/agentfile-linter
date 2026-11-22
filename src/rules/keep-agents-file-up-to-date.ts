@@ -2,7 +2,7 @@ import { basename } from "node:path";
 
 import { hasUncommittedChanges, lastCommitTime, readIndex } from "#src/git.ts";
 import type { Project } from "#src/project.ts";
-import type { OptionSchema } from "#src/schema.ts";
+import { countSchema } from "#src/schema.ts";
 import { firstLineRange } from "#src/text.ts";
 import type { Rule } from "#src/types.ts";
 
@@ -21,17 +21,6 @@ const DAY_SECONDS = 24 * 60 * 60;
  * archives, 1985 in npm packages), not from edits.
  */
 const EARLIEST_MODIFICATION = Date.UTC(2023, 0, 1) / 1000;
-
-/** A non-negative number, also accepted as a string of digits (`"30"`). */
-function count(description: string): OptionSchema {
-  return {
-    description,
-    anyOf: [
-      { type: "number", minimum: 0 },
-      { type: "string", pattern: "^[0-9]+$" },
-    ],
-  };
-}
 
 interface LastUpdate {
   /** Unix seconds. */
@@ -64,10 +53,10 @@ export const keepAgentsFileUpToDate: Rule<KeepAgentsFileUpToDateOptions> = {
     schema: {
       type: "object",
       properties: {
-        warnIfNotUpdatedForDays: count(
+        warnIfNotUpdatedForDays: countSchema(
           "Report files not changed for more than this many days (by last commit, or by modification time for files without Git history).",
         ),
-        warnOnlyForFilesLongerThanChars: count(
+        warnOnlyForFilesLongerThanChars: countSchema(
           "Skip files with at most this many characters (ignoring surrounding whitespace), e.g. `@AGENTS.md` pointers.",
         ),
       },
