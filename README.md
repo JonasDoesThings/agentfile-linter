@@ -164,12 +164,12 @@ to turn these reports off.
 
 ## Rule details
 
-<details>
-<summary>Descriptions and options for every rule</summary>
-
 ### `agentfile/no-missing-path`
 
-Checks inline code spans that look like paths, plus `@path/to/file.md` imports (the import syntax of Claude Code and Gemini CLI).
+Checks path-like code spans and `@path/to/file.md` imports in context files.
+
+<details>
+<summary>Details and configuration options</summary>
 
 - **What counts as a path:** a span with a known file extension (`src/index.ts`, `package.json`), a `./` or `../` prefix, a trailing slash (`docs/`), a dotfile (`.env.example`), a well-known file name (`Makefile`, `Dockerfile`, …) or a glob (`src/**/*.test.ts`).
 - **Slash paths without an extension** (`src/components`) are checked only when their first segment exists. Module names like `react-dom/client` or `origin/main` are therefore ignored.
@@ -186,9 +186,14 @@ Checks inline code spans that look like paths, plus `@path/to/file.md` imports (
 | `allowSuffixMatch` | `true`  | Accept paths that match the end of a project path |
 | `checkImports`     | `true`  | Check `@path` imports                             |
 
+</details>
+
 ### `agentfile/no-missing-script`
 
-Finds task-runner commands in inline code and in shell code blocks (`sh`, `bash`, `console`, untagged, …). It then checks that the script, target or task exists where the command would run.
+Finds documented task-runner commands and checks whether each script, target or task exists.
+
+<details>
+<summary>Details and configuration options</summary>
 
 - **Working directory:** the context file's directory. `cd dir && …` is followed, and so is `cd` across the lines of one code block. Relative directories (`cd apps/web`, `make -C sub`) are resolved from the file's directory first, then from its parent directories up to the project root.
 - **Config files are searched upward.** That covers `package.json`, `Makefile`, `justfile` and the others in the table below.
@@ -227,9 +232,14 @@ Each runner stays quiet when it can't decide statically. Examples: computed Make
 | `ignore`        | `[]`    | Glob patterns of script, target or task names to skip                                                                                                                                                                                    |
 | `ignoreRunners` | `[]`    | Runners not to check, e.g. `["maven", "gradle"]`. Runner ids: `npm`, `pnpm`, `yarn`, `bun`, `deno`, `make`, `just`, `task`, `poetry`, `uv`, `pdm`, `rye`, `hatch`, `pipenv`, `poe`, `tox`, `nox`, `maven`, `gradle`, `composer`, `cargo` |
 
+</details>
+
 ### `agentfile/no-broken-reference`
 
-Checks relative Markdown links, images, reference definitions and `href`/`src` in inline HTML.
+Checks relative Markdown links, images, reference definitions and inline HTML link targets.
+
+<details>
+<summary>Details and configuration options</summary>
 
 - `#anchor` must match a heading in the same file, using GitHub-style slugs. Duplicate headings get `-1`, `-2` suffixes. Explicit `id`/`name` anchors also count.
 - `other.md#anchor` must match a heading in the target Markdown file.
@@ -244,9 +254,16 @@ Checks relative Markdown links, images, reference definitions and `href`/`src` i
 | `checkLines`   | `true`  | Check `#L42` line fragments against the file length |
 | `ignore`       | `[]`    | Glob patterns of link targets to skip               |
 
+</details>
+
 ### `agentfile/no-agent-files-drift`
 
-The agent files in one directory (`AGENTS.md`, `AGENT.md`, `CLAUDE.md`, `GEMINI.md`) must have the same effective content. A file passes when it:
+Checks that agent files in the same directory have the same effective content.
+
+<details>
+<summary>Details and configuration options</summary>
+
+A file passes when it:
 
 - is a symlink to another file in the group,
 - has identical text (differences in BOM, line endings and trailing whitespace are ignored), or
@@ -259,9 +276,16 @@ The first existing file in `files` order is canonical. Every other file is compa
 | `files`        | `["AGENTS.md", "AGENT.md", "CLAUDE.md", "GEMINI.md"]` | Files that must stay in sync, in order of precedence |
 | `allowImports` | `true`                                                | Accept `@OTHER.md` pointer files                     |
 
+</details>
+
 ### `agentfile/no-invalid-skill`
 
-Checks [Agent Skills](https://agentskills.io/specification) instead of context files. It looks for skills directories below the linted directories: `.claude/skills`, `.agents/skills`, `.github/skills`, `.codex/skills`, `.gemini/skills`, `.cursor/skills`, `.devin/skills`, `.windsurf/skills` and `.kiro/skills` at any depth. It also checks the `skills/` directory of every Claude Code plugin (a directory in the project with `.claude-plugin/plugin.json`). Git-ignored skills and skills matching `ignorePatterns` are skipped.
+Checks Agent Skills directories for valid layout and `SKILL.md` frontmatter.
+
+<details>
+<summary>Details and configuration options</summary>
+
+It looks for skills directories below the linted directories: `.claude/skills`, `.agents/skills`, `.github/skills`, `.codex/skills`, `.gemini/skills`, `.cursor/skills`, `.devin/skills`, `.windsurf/skills` and `.kiro/skills` at any depth. It also checks the `skills/` directory of every Claude Code plugin (a directory in the project with `.claude-plugin/plugin.json`). Git-ignored skills and skills matching `ignorePatterns` are skipped.
 
 Skills directories are matched by their path relative to the project root (the Git root, or the linted directory outside Git), never by directories above it. In a repository whose root is a `.claude` directory, configure `"directories": ["skills"]`.
 
@@ -291,7 +315,14 @@ Grouping folders (`skills/review/security/SKILL.md`, supported by Codex, Cursor 
 
 `overrides` apply per skill. For example, `"files": [".claude/skills/legacy/**"]` changes the rule for one skill. An override can match the skill file or the skills root; one that matches the skills root (`"files": ["custom"]`) applies its severity and all options to every skill in it.
 
+</details>
+
 ### `agentfile/no-misnamed-agent-file`
+
+Reports context files whose names differ from the expected names by case.
+
+<details>
+<summary>Details and configuration options</summary>
 
 Agents look for `AGENTS.md`, `AGENT.md`, `CLAUDE.md`, `CLAUDE.local.md` and `GEMINI.md` by their exact name. On case-insensitive file systems (the macOS and Windows default), `agents.md` or `CLAUDE.MD` is found anyway, so the mistake goes unnoticed until a teammate or CI runs on Linux, where the file is silently ignored. This rule reports such files:
 
@@ -300,9 +331,16 @@ Agents look for `AGENTS.md`, `AGENT.md`, `CLAUDE.md`, `CLAUDE.local.md` and `GEM
 
 A file is never reported when the correctly named file exists next to it (possible on case-sensitive file systems) or when it matches the [`files`](#options) patterns, and git-ignored files are skipped unless named on the command line. A `SKILL.md` in the wrong case is reported by [`agentfile/no-invalid-skill`](#agentfileno-invalid-skill). Rename tracked files with `git mv`: on case-insensitive file systems, Git doesn't notice a plain rename that only changes case.
 
+</details>
+
 ### `agentfile/no-unnecessary-agent-files`
 
-Off by default. Since v2.1.277, Claude Code reads `AGENTS.md` when there is no `CLAUDE.md`, so one `AGENTS.md` can serve all agents. This rule reports a `CLAUDE.md` that only mirrors the `AGENTS.md` in its directory. That is the case when `CLAUDE.md`:
+Off by default. Reports a `CLAUDE.md` that only mirrors the `AGENTS.md` in its directory.
+
+<details>
+<summary>Details and configuration options</summary>
+
+Since v2.1.277, Claude Code reads `AGENTS.md` when there is no `CLAUDE.md`, so one `AGENTS.md` can serve all agents. A `CLAUDE.md` is considered a mirror when it:
 
 - is a symlink to `AGENTS.md` (or the other way around, or both link to the same file),
 - has the same content (differences in BOM, line endings and trailing whitespace are ignored), or
@@ -314,9 +352,16 @@ The rule only looks inside the project (the Git repository), so it gives the sam
 
 Keep the `CLAUDE.md` if your team uses older Claude Code versions or sets "Project instructions"to `claude-md` in `/config`.
 
+</details>
+
 ### `agentfile/keep-agents-file-up-to-date`
 
-Off by default. Reports context files that have not changed for more than `warnIfNotUpdatedForDays`. Agent instructions go stale as a project changes. Any change, even a small one, resets the timer: a commit in Git, otherwise any edit to the file.
+Off by default. Reports context files not changed in more than `warnIfNotUpdatedForDays`.
+
+<details>
+<summary>Details and configuration options</summary>
+
+Agent instructions go stale as a project changes. Any change, even a small one, resets the timer: a commit in Git, otherwise any edit to the file.
 
 ```jsonc
 "rules": {
@@ -337,9 +382,16 @@ Off by default. Reports context files that have not changed for more than `warnI
 | `warnIfNotUpdatedForDays`         | `120`   | Report files not changed for more than this many days (a number or a string like `"30"`)      |
 | `warnOnlyForFilesLongerThanChars` | `0`     | Skip files with at most this many characters (ignoring surrounding whitespace), e.g. pointers |
 
+</details>
+
 ### `agentfile/limit-file-size`
 
-Off by default. Reports context files with more than `maxChars` characters. Agents load these files into every session, so a long file uses up tokens on every task and buries the instructions that matter. Some agents also enforce limits: Codex stops reading `AGENTS.md` files once their combined size reaches 32 KiB (`project_doc_max_bytes`), and Claude Code warns about a `CLAUDE.md` with more than 40,000 characters.
+Off by default. Reports context files longer than `maxChars` characters.
+
+<details>
+<summary>Details and configuration options</summary>
+
+Some agents also enforce limits: Codex stops reading `AGENTS.md` files once their combined size reaches 32 KiB (`project_doc_max_bytes`), and Claude Code warns about a `CLAUDE.md` with more than 40,000 characters.
 
 ```jsonc
 "rules": {
