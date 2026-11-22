@@ -15,7 +15,15 @@ export const CONFIG_FILE_NAMES = [".agentfile-linterrc.json", ".agentfile-linter
 /** Context files linted when the config doesn't specify `files`. */
 export { DEFAULT_FILE_PATTERNS };
 
-const TOP_LEVEL_KEYS = new Set(["$schema", "files", "categories", "rules", "overrides", "ignorePatterns"]);
+const TOP_LEVEL_KEYS = new Set([
+  "$schema",
+  "files",
+  "categories",
+  "rules",
+  "overrides",
+  "ignorePatterns",
+  "reportUnnecessarySuppressions",
+]);
 
 export class ConfigError extends Error {
   override name = "ConfigError";
@@ -41,6 +49,8 @@ export interface Config {
   rules: Map<string, RuleSetting>;
   overrides: Override[];
   ignorePatterns: string[];
+  /** Report inline directives that suppress nothing. */
+  reportUnnecessarySuppressions: boolean;
 }
 
 export function emptyConfig(dir: string): Config {
@@ -52,6 +62,7 @@ export function emptyConfig(dir: string): Config {
     rules: new Map(),
     overrides: [],
     ignorePatterns: [],
+    reportUnnecessarySuppressions: true,
   };
 }
 
@@ -153,6 +164,11 @@ export function parseConfig(raw: unknown, path: string | null, dir: string): Con
   const files = parseStringArray(raw.files, `${label}: "files"`);
   if (files && files.length === 0) throw new ConfigError(`${label}: "files" must not be empty`);
 
+  const reportUnnecessarySuppressions = raw.reportUnnecessarySuppressions ?? true;
+  if (typeof reportUnnecessarySuppressions !== "boolean") {
+    throw new ConfigError(`${label}: "reportUnnecessarySuppressions" must be a boolean`);
+  }
+
   return {
     path,
     dir,
@@ -161,6 +177,7 @@ export function parseConfig(raw: unknown, path: string | null, dir: string): Con
     rules: parseRules(raw.rules, `${label}: "rules"`),
     overrides,
     ignorePatterns: parseStringArray(raw.ignorePatterns, `${label}: "ignorePatterns"`) ?? [],
+    reportUnnecessarySuppressions,
   };
 }
 
@@ -369,6 +386,7 @@ export class RuleResolver {
         ),
       })),
       ignorePatterns: this.config.ignorePatterns,
+      reportUnnecessarySuppressions: this.config.reportUnnecessarySuppressions,
     };
   }
 }

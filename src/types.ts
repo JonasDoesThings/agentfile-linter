@@ -31,6 +31,11 @@ export interface RuleMeta {
   defaultSeverity: Exclude<Severity, "off">;
   /** Schema of the rule's options object (used for validation and JSON schema generation). */
   schema?: OptionSchema;
+  /**
+   * Whether the rule's problems depend on the current time, so they can appear while the files stay
+   * the same. A directive for such a rule is never reported as unnecessary.
+   */
+  timeDependent?: boolean;
 }
 
 /** A file or directory found by a tree rule's discovery, such as a SKILL.md file. */

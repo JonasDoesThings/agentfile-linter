@@ -18,7 +18,14 @@ import { discoverFiles } from "./discovery.ts";
 import { PatternIgnore } from "./gitignore.ts";
 import { computeLineStarts, parseMarkdown } from "./markdown.ts";
 import { ALWAYS_SKIPPED_DIRS, type Project, ProjectRegistry, tryRealpath } from "./project.ts";
-import { applySuppressions, collectDirectives, type Directive, unknownRuleDiagnostics } from "./suppressions.ts";
+import {
+  applySuppressions,
+  collectDirectives,
+  type Directive,
+  suppresses,
+  unknownRuleDiagnostics,
+  unnecessarySuppressionDiagnostics,
+} from "./suppressions.ts";
 import type {
   AnyRule,
   Diagnostic,
@@ -427,6 +434,8 @@ async function lintTree(
   const diagnostics: Diagnostic[] = [];
   const checked = new Set<string>();
   const enabledRules = new Set<string>();
+  /** The rules that checked each file, by real path. */
+  const checkedBy = new Map<string, Set<string>>();
   // Overrides matching the root an input was found in apply to everything reported at its path.
   const rootsByRule = new Map(
     [...inputs.treeInputs].map(([rule, ruleInputs]) => [
@@ -443,12 +452,13 @@ async function lintTree(
       const markChecked = (path: string) => {
         checked.add(path);
         enabledRules.add(ruleId);
+        const realPath = inputs.aliases.realPath(path);
+        const rules = checkedBy.get(realPath);
+        if (rules) rules.add(ruleId);
+        else checkedBy.set(realPath, new Set([ruleId]));
       };
-      const isSuppressed = (path: string, start: Position) => {
-        const fileDirectives = treeFileDirectives(path, inputs.aliases.realPath(path), registry, directives);
-        const problem = { ...fileDiagnostic(path, ""), ruleId, start, end: start };
-        return applySuppressions([problem], fileDirectives).length === 0;
-      };
+      const isSuppressed = (path: string, start: Position) =>
+        suppresses(treeFileDirectives(path, inputs.aliases.realPath(path), registry, directives), ruleId, start.line);
       try {
         await rule.checkTree?.({
           ...treeDiscoveryContext(rule, inputs, registry, resolver),
@@ -486,7 +496,7 @@ async function lintTree(
   );
   const { aliases } = inputs;
   const checkedFiles = new Set(aliases.canonical(checked).values());
-  return { diagnostics: aliases.dedupe(diagnostics), checkedFiles, enabledRules };
+  return { diagnostics: aliases.dedupe(diagnostics), checkedFiles, enabledRules, checkedBy };
 }
 
 /**
@@ -536,6 +546,8 @@ export async function lint(options: LintOptions = {}, prepared?: LintSetup): Pro
   const { resolver } = ready;
 
   const enabledRules = new Set<string>();
+  /** The per-file rules run on each linted file. */
+  const fileRules = new Map<string, string[]>();
   const directives: DirectiveCache = new Map();
   // The tree pass runs while per-file rules wait on I/O (such as Git processes). Files are parsed
   // (and their directives cached) before the first await, so the tree pass reuses them.
@@ -543,21 +555,33 @@ export async function lint(options: LintOptions = {}, prepared?: LintSetup): Pro
     Promise.all(
       paths.map(async (path): Promise<FileResult> => {
         const rules = resolver.forFile(path);
+        const checking = rules.filter((r) => r.rule.check !== undefined).map((r) => r.rule.meta.name);
+        fileRules.set(path, checking);
         // Tree rules count once they check something (see `tree.enabledRules`).
-        for (const r of rules) if (r.rule.check) enabledRules.add(r.rule.meta.name);
+        for (const name of checking) enabledRules.add(name);
         const project = registry.forDirectory(dirname(path));
         return { filePath: path, diagnostics: await lintFile(path, project, rules, directives) };
       }),
     ),
     lintTree(inputs, registry, resolver, ready.cwd, directives),
   ]);
-  // Directives in context files are checked by `lintFile`; these are the ones in files that only
-  // tree rules check, such as SKILL.md.
   const realPath = (path: string) => inputs.aliases.realPath(path);
   const lintedFiles = new Set(paths.map(realPath));
-  const directiveNotes = [...tree.checkedFiles]
-    .filter((path) => !lintedFiles.has(realPath(path)))
-    .flatMap((path) => unknownRuleDiagnostics(path, treeFileDirectives(path, realPath(path), registry, directives)));
+  // `lintFile` reports unknown rules in the directives of context files; these are the ones in files
+  // that only tree rules check, such as SKILL.md.
+  const treeOnlyFiles = [...tree.checkedFiles].filter((path) => !lintedFiles.has(realPath(path)));
+  const directiveNotes = treeOnlyFiles.flatMap((path) =>
+    unknownRuleDiagnostics(path, treeFileDirectives(path, realPath(path), registry, directives)),
+  );
+  // Both passes have recorded which directives suppressed something.
+  if (ready.config.reportUnnecessarySuppressions) {
+    for (const path of [...paths, ...treeOnlyFiles]) {
+      const real = realPath(path);
+      const checkedBy = new Set([...(fileRules.get(path) ?? []), ...(tree.checkedBy.get(real) ?? [])]);
+      const fileDirectives = treeFileDirectives(path, real, registry, directives);
+      directiveNotes.push(...unnecessarySuppressionDiagnostics(path, fileDirectives, checkedBy));
+    }
+  }
   const files = mergeDiagnostics(linted, [...tree.diagnostics, ...directiveNotes], tree.checkedFiles, realPath);
   const fileCount = new Set([...paths, ...tree.checkedFiles]).size;
   for (const rule of tree.enabledRules) enabledRules.add(rule);

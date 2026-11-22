@@ -180,6 +180,7 @@ describe("inline suppressions", () => {
     });
     expect(messages(await run(root, { config: false }))).toEqual([
       "Path `c.ts` does not exist",
+      "Unnecessary suppression of `no-broken-reference` in `agentfile-linter-disable-line` directive",
       "Path `e.ts` does not exist",
     ]);
   });
@@ -205,13 +206,15 @@ describe("inline suppressions", () => {
     });
     const result = await lint({ cwd: root, config: false });
     expect(result).toMatchObject({ errorCount: 0, warningCount: 0 });
-    const notes = (await run(root, { config: false })).map(({ line, column, message, help, severity, rule }) => ({
-      at: `${line}:${column}`,
-      message,
-      help,
-      severity,
-      rule,
-    }));
+    const notes = (await run(root, { config: false }))
+      .filter(({ message }) => message.startsWith("Unknown rule"))
+      .map(({ line, column, message, help, severity, rule }) => ({
+        at: `${line}:${column}`,
+        message,
+        help,
+        severity,
+        rule,
+      }));
     const other = expect.stringContaining("`agentfile-linter --rules` lists all rules");
     expect(notes).toEqual([
       {
@@ -233,6 +236,13 @@ describe("inline suppressions", () => {
       // Without ` -- `, a reason is read as rule names.
       { at: "13:59", message: expect.stringContaining("`missing`"), help: other, severity: "info", rule: null },
       { at: "13:67", message: expect.stringContaining("`file`"), help: other, severity: "info", rule: null },
+    ]);
+  });
+
+  test("an unknown rule name in a frontmatter disable is reported once", async () => {
+    const root = makeProject({ "AGENTS.md": "---\n# agentfile-linter-disable typo\ntitle: Rules\n---\n" });
+    expect(messages(await run(root, { config: false }))).toEqual([
+      "Unknown rule `typo` in `agentfile-linter-disable` directive",
     ]);
   });
 
@@ -261,6 +271,156 @@ describe("inline suppressions", () => {
         column: 38,
         severity: "info",
         help: "Did you mean `agentfile/no-invalid-skill`?",
+      }),
+    ]);
+  });
+});
+
+/** Diagnostics with their location as `line:column`. */
+const notes = async (root: string, options: Parameters<typeof run>[1] = { config: false }) =>
+  (await run(root, options)).map(({ line, column, message, help, severity, rule }) => ({
+    at: `${line}:${column}`,
+    message,
+    help,
+    severity,
+    rule,
+  }));
+
+describe("unnecessary suppressions", () => {
+  test("directives that suppress nothing are reported as info", async () => {
+    const root = makeProject({
+      "AGENTS.md": [
+        "<!-- agentfile-linter-disable-next-line agentfile/no-missing-path -->",
+        "Nothing to suppress here.",
+        "",
+        "Plain text <!-- agentfile-linter-disable-line -->",
+        "",
+        "<!-- agentfile-linter-disable no-missing-script -- generated section -->",
+        "No scripts here.",
+        "<!-- agentfile-linter-enable no-missing-script -->",
+        "",
+        "`a.ts` <!-- agentfile-linter-disable-line no-missing-path no-broken-reference -->",
+        "",
+        "<!-- agentfile-linter-disable-next-line -->",
+        "`b.ts`",
+        "",
+      ].join("\n"),
+    });
+    expect(await lint({ cwd: root, config: false })).toMatchObject({ errorCount: 0, warningCount: 0 });
+    expect(await notes(root)).toEqual([
+      {
+        at: "1:41",
+        message:
+          "Unnecessary suppression of `agentfile/no-missing-path` in `agentfile-linter-disable-next-line` directive",
+        help: "The rule reports no problem on the next line. Remove the directive.",
+        severity: "info",
+        rule: null,
+      },
+      {
+        at: "4:12",
+        message: "Unnecessary `agentfile-linter-disable-line` directive",
+        help: "No rule reports a problem on this line. Remove the directive.",
+        severity: "info",
+        rule: null,
+      },
+      {
+        at: "6:31",
+        message: "Unnecessary suppression of `no-missing-script` in `agentfile-linter-disable` directive",
+        help: "The rule reports no problem in its range. Remove the directive.",
+        severity: "info",
+        rule: null,
+      },
+      {
+        at: "10:59",
+        message: "Unnecessary suppression of `no-broken-reference` in `agentfile-linter-disable-line` directive",
+        help: "The rule reports no problem on this line. Remove `no-broken-reference` from the directive.",
+        severity: "info",
+        rule: null,
+      },
+    ]);
+  });
+
+  test("`reportUnnecessarySuppressions: false` turns the reports off", async () => {
+    const root = makeProject({
+      ".agentfile-linterrc.json": { reportUnnecessarySuppressions: false },
+      "AGENTS.md": "Plain text <!-- agentfile-linter-disable-line -->\n<!-- agentfile-linter-disable typo -->\n",
+    });
+    expect(messages(await run(root))).toEqual(["Unknown rule `typo` in `agentfile-linter-disable` directive"]);
+  });
+
+  test("every directive that covers a problem counts as used", async () => {
+    const root = makeProject({
+      "AGENTS.md": [
+        "<!-- agentfile-linter-disable -->",
+        "<!-- agentfile-linter-disable no-missing-path -->",
+        "`a.ts` <!-- agentfile-linter-disable-line no-missing-path -->",
+        "<!-- agentfile-linter-enable -->",
+        "",
+        "<!-- agentfile-linter-disable no-missing-path no-broken-reference -->",
+        "[x](./missing.md)",
+        "<!-- agentfile-linter-enable no-broken-reference -->",
+        "`b.ts`",
+        "",
+      ].join("\n"),
+    });
+    // The first `disable` is overridden for `no-missing-path` by the second one, which takes the credit.
+    expect(messages(await run(root, { config: false }))).toEqual(["Unnecessary `agentfile-linter-disable` directive"]);
+  });
+
+  test("directives for rules that don't check the file are not reported", async () => {
+    const root = makeProject({
+      "AGENTS.md": [
+        "<!-- agentfile-linter-disable-next-line no-missing-script -->",
+        "Text.",
+        "<!-- agentfile-linter-disable-next-line no-invalid-skill no-unnecessary-agent-files -->",
+        "Text. <!-- agentfile-linter-disable-line -->",
+        "",
+      ].join("\n"),
+    });
+    // No rule checks the file, so even the directive for all rules may be needed elsewhere.
+    expect(await run(root, { config: false, ruleFlags: [{ severity: "off", target: "all" }] })).toEqual([]);
+    // `no-invalid-skill` checks skills, not context files; `no-unnecessary-agent-files` is off by default.
+    const ruleFlags = [{ severity: "off" as const, target: "no-missing-script" }];
+    expect(messages(await run(root, { config: false, ruleFlags }))).toEqual([
+      "Unnecessary `agentfile-linter-disable-line` directive",
+    ]);
+  });
+
+  test("directives that a rule depending on the current time may need are not reported", async () => {
+    const root = makeProject({
+      "AGENTS.md": [
+        "# Notes <!-- agentfile-linter-disable-line agentfile/keep-agents-file-up-to-date no-missing-path -->",
+        "Text. <!-- agentfile-linter-disable-line -->",
+        "",
+      ].join("\n"),
+    });
+    const ruleFlags = [{ severity: "warn" as const, target: "keep-agents-file-up-to-date" }];
+    // The file is new today, but the directives take effect once it is old.
+    expect(messages(await run(root, { config: false, ruleFlags }))).toEqual([
+      "Unnecessary suppression of `no-missing-path` in `agentfile-linter-disable-line` directive",
+    ]);
+  });
+
+  test("directives used by tree rules are not reported", async () => {
+    const root = makeProject({
+      "AGENTS.md": "# Rules\n",
+      "CLAUDE.md": "<!-- agentfile-linter-disable-line no-unnecessary-agent-files -->\n@AGENTS.md\n",
+      ".agents/skills/demo/SKILL.md": [
+        "---",
+        "# agentfile-linter-disable-next-line no-invalid-skill",
+        "name: Demo",
+        "# agentfile-linter-disable-next-line no-invalid-skill",
+        "description: Does the thing. Use when the user asks for it.",
+        "---",
+        "",
+      ].join("\n"),
+    });
+    const ruleFlags = [{ severity: "warn" as const, target: "no-unnecessary-agent-files" }];
+    expect(await run(root, { config: false, ruleFlags })).toEqual([
+      expect.objectContaining({
+        file: ".agents/skills/demo/SKILL.md",
+        line: 4,
+        message: "Unnecessary suppression of `no-invalid-skill` in `agentfile-linter-disable-next-line` directive",
       }),
     ]);
   });

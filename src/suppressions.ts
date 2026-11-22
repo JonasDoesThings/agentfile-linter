@@ -1,6 +1,6 @@
 import { CST, Lexer } from "yaml";
 
-import { resolveRuleName, suggestRuleName } from "#src/rules/index.ts";
+import { resolveRuleName, RULES, suggestRuleName } from "#src/rules/index.ts";
 
 import { extractFrontmatter } from "./frontmatter.ts";
 import { visit } from "./markdown.ts";
@@ -15,12 +15,21 @@ export interface Directive {
   rules: Set<string> | null;
   line: number;
   endLine: number;
-  /** Names that are not rules (most likely typos), which suppress nothing. */
-  unknownRules: UnknownRule[];
+  /** Location of the whole comment. */
+  start: Position;
+  end: Position;
+  /** The names in the rule list, as written. */
+  names: DirectiveName[];
+  /** Rules whose problems the directive suppressed, recorded by {@link suppresses}. */
+  used: Set<string>;
+  /** Added on behalf of another directive, whose `used` it shares. Never reported itself. */
+  implicit?: boolean;
 }
 
-export interface UnknownRule {
+export interface DirectiveName {
   name: string;
+  /** The rule's full name, or undefined for a name that isn't a rule (most likely a typo), which suppresses nothing. */
+  rule: string | undefined;
   start: Position;
   end: Position;
 }
@@ -43,26 +52,27 @@ function yamlComments(source: string): { text: string; line: number }[] {
 interface ParsedRules {
   /** Rule names, or null for all rules. */
   rules: Set<string> | null;
-  /** Names that are not rules, with their offset in the parsed text. */
-  unknown: { name: string; index: number }[];
+  /** The listed names, with their offset in the parsed text. */
+  names: { name: string; rule: string | undefined; index: number }[];
 }
 
 /** Rule names of a directive (before an optional `-- reason`). */
 function parseRules(text: string): ParsedRules {
   const list = text.split(/\s--\s|^--\s/)[0] ?? "";
-  if (!list.trim()) return { rules: null, unknown: [] };
+  if (!list.trim()) return { rules: null, names: [] };
   const rules = new Set<string>();
-  const unknown: ParsedRules["unknown"] = [];
+  const names: ParsedRules["names"] = [];
   for (const { 0: name, index } of list.matchAll(/[^\s,]+/g)) {
     const rule = resolveRuleName(name);
     rules.add(rule ?? name);
-    if (!rule) unknown.push({ name, index });
+    names.push({ name, rule, index });
   }
-  return { rules, unknown };
+  return { rules, names };
 }
 
-const nameRange = (name: string, start: Position): UnknownRule => ({
+const nameRange = ({ name, rule }: ParsedRules["names"][number], start: Position): DirectiveName => ({
   name,
+  rule,
   start,
   end: { line: start.line, column: start.column + name.length },
 });
@@ -94,15 +104,27 @@ function frontmatterDirectives(file: Pick<LintedFile, "ast" | "text">): Directiv
     if (!match) continue;
     const kind = match[1] as DirectiveKind;
     const list = match[2] as string;
-    const { rules, unknown } = parseRules(list);
+    const parsed = parseRules(list);
     const line = frontmatter.firstLine + comment.line;
     // A comment runs to the end of its line; the rule list ends it.
     const sourceLine = lines[comment.line] ?? "";
-    const listColumn = Math.max(0, sourceLine.lastIndexOf(comment.text)) + comment.text.length - list.length + 1;
-    const unknownRules = unknown.map(({ name, index }) => nameRange(name, { line, column: listColumn + index }));
-    directives.push({ kind, rules, line, endLine: line, unknownRules });
+    const column = Math.max(0, sourceLine.lastIndexOf(comment.text)) + 1;
+    const listColumn = column + comment.text.length - list.length;
+    const directive: Directive = {
+      kind,
+      rules: parsed.rules,
+      line,
+      endLine: line,
+      start: { line, column },
+      end: { line, column: column + comment.text.length },
+      names: parsed.names.map((name) => nameRange(name, { line, column: listColumn + name.index })),
+      used: new Set(),
+    };
+    directives.push(directive);
     // Problems with the frontmatter as a whole are reported on the opening `---`.
-    if (kind === "disable") directives.push({ kind: "disable-line", rules, line: 1, endLine: 1, unknownRules: [] });
+    if (kind === "disable") {
+      directives.push({ ...directive, kind: "disable-line", line: 1, endLine: 1, names: [], implicit: true });
+    }
   }
   return directives;
 }
@@ -132,13 +154,20 @@ export function collectDirectives(file: Pick<LintedFile, "ast" | "text">): Direc
       return { line, column: indent + offset - newline };
     };
     for (const match of node.value.matchAll(DIRECTIVE_RE)) {
-      const line = positionAt(match.index).line;
-      const endLine = line + (match[0].match(/\n/g)?.length ?? 0);
+      const start = positionAt(match.index);
       const list = match[2] as string;
       const listOffset = match.index + match[0].length - "-->".length - list.length;
-      const { rules, unknown } = parseRules(list);
-      const unknownRules = unknown.map(({ name, index }) => nameRange(name, positionAt(listOffset + index)));
-      directives.push({ kind: match[1] as DirectiveKind, rules, line, endLine, unknownRules });
+      const parsed = parseRules(list);
+      directives.push({
+        kind: match[1] as DirectiveKind,
+        rules: parsed.rules,
+        line: start.line,
+        endLine: start.line + (match[0].match(/\n/g)?.length ?? 0),
+        start,
+        end: positionAt(match.index + match[0].length),
+        names: parsed.names.map((name) => nameRange(name, positionAt(listOffset + name.index))),
+        used: new Set(),
+      });
     }
   });
   return directives;
@@ -150,51 +179,126 @@ export function collectDirectives(file: Pick<LintedFile, "ast" | "text">): Direc
  */
 export function unknownRuleDiagnostics(filePath: string, directives: readonly Directive[]): Diagnostic[] {
   return directives.flatMap((directive) =>
-    directive.unknownRules.map(({ name, start, end }): Diagnostic => {
+    directive.names.flatMap(({ name, rule, start, end }): Diagnostic[] => {
+      if (rule) return [];
       const suggestion = suggestRuleName(name);
-      return {
+      return [
+        {
+          ruleId: null,
+          severity: "info",
+          message: `Unknown rule \`${name}\` in \`agentfile-linter-${directive.kind}\` directive`,
+          help: suggestion
+            ? `Did you mean \`${suggestion}\`?`
+            : "`agentfile-linter --rules` lists all rules. Separate a reason from the rule names with ` -- `.",
+          filePath,
+          start,
+          end,
+        },
+      ];
+    }),
+  );
+}
+
+/** Where a directive suppresses problems, for messages. */
+const SCOPE: Record<DirectiveKind, string> = {
+  disable: "in its range",
+  "disable-line": "on this line",
+  "disable-next-line": "on the next line",
+  enable: "",
+};
+
+/**
+ * Info diagnostics for directives that suppressed nothing: a directive for all rules that no
+ * problem needed, or a listed rule with no problem to suppress. Only rules in `checkedBy`, the
+ * rules that checked the file, count: a directive for a rule that is off may be needed where it
+ * is on. Call it after all rules have run, so that {@link suppresses} has recorded every use.
+ */
+export function unnecessarySuppressionDiagnostics(
+  filePath: string,
+  directives: readonly Directive[],
+  checkedBy: ReadonlySet<string>,
+): Diagnostic[] {
+  // Problems of a rule that depends on the current time come and go while the file stays the same.
+  const isStable = (rule: string) => checkedBy.has(rule) && !RULES.get(rule)?.meta.timeDependent;
+  const allStable = checkedBy.size > 0 && [...checkedBy].every(isStable);
+  const diagnostics: Diagnostic[] = [];
+  for (const directive of directives) {
+    if (directive.kind === "enable" || directive.implicit) continue;
+    const label = `\`agentfile-linter-${directive.kind}\``;
+    const scope = SCOPE[directive.kind];
+    if (directive.rules === null) {
+      if (directive.used.size > 0 || !allStable) continue;
+      diagnostics.push({
         ruleId: null,
         severity: "info",
-        message: `Unknown rule \`${name}\` in \`agentfile-linter-${directive.kind}\` directive`,
-        help: suggestion
-          ? `Did you mean \`${suggestion}\`?`
-          : "`agentfile-linter --rules` lists all rules. Separate a reason from the rule names with ` -- `.",
+        message: `Unnecessary ${label} directive`,
+        help: `No rule reports a problem ${scope}. Remove the directive.`,
+        filePath,
+        start: directive.start,
+        end: directive.end,
+      });
+      continue;
+    }
+    const listed = new Set<string>();
+    const unused = directive.names.filter(({ rule }) => {
+      if (!rule || listed.has(rule)) return false;
+      listed.add(rule);
+      return isStable(rule) && !directive.used.has(rule);
+    });
+    for (const { name, start, end } of unused) {
+      const fix = unused.length === listed.size ? "Remove the directive." : `Remove \`${name}\` from the directive.`;
+      diagnostics.push({
+        ruleId: null,
+        severity: "info",
+        message: `Unnecessary suppression of \`${name}\` in ${label} directive`,
+        help: `The rule reports no problem ${scope}. ${fix}`,
         filePath,
         start,
         end,
-      };
-    }),
-  );
+      });
+    }
+  }
+  return diagnostics;
 }
 
 function applies(directive: Directive, ruleId: string): boolean {
   return directive.rules === null || directive.rules.has(ruleId);
 }
 
-export function applySuppressions(diagnostics: Diagnostic[], directives: Directive[]): Diagnostic[] {
-  if (directives.length === 0) return diagnostics;
+/**
+ * Whether the directives suppress a problem of `ruleId` on `line`. Each directive that does, every
+ * line directive covering it and the range directive in effect, records the rule as used.
+ */
+export function suppresses(directives: readonly Directive[], ruleId: string, line: number): boolean {
+  const found = directives.filter(
+    (d) =>
+      applies(d, ruleId) &&
+      ((d.kind === "disable-line" && line >= d.line && line <= d.endLine) ||
+        (d.kind === "disable-next-line" && line === d.endLine + 1)),
+  );
+  // The `disable` directive in effect for all rules and for single rules (null after an `enable`).
+  let all: Directive | null = null;
+  const perRule = new Map<string, Directive | null>();
   // In source order: frontmatter directives come first, then the HTML comments in document order.
-  const ranged = directives.filter((d) => d.kind === "disable" || d.kind === "enable");
-  return diagnostics.filter((diagnostic) => {
-    const ruleId = diagnostic.ruleId;
-    if (!ruleId) return true;
-    const line = diagnostic.start.line;
-    for (const d of directives) {
-      if (d.kind === "disable-line" && line >= d.line && line <= d.endLine && applies(d, ruleId)) return false;
-      if (d.kind === "disable-next-line" && line === d.endLine + 1 && applies(d, ruleId)) return false;
+  for (const d of directives) {
+    if (d.kind !== "disable" && d.kind !== "enable") continue;
+    if (d.line > line) break;
+    const state = d.kind === "disable" ? d : null;
+    if (d.rules === null) {
+      all = state;
+      perRule.clear();
+    } else {
+      for (const r of d.rules) perRule.set(r, state);
     }
-    let allDisabled = false;
-    const perRule = new Map<string, boolean>();
-    for (const d of ranged) {
-      if (d.line > line) break;
-      const disabled = d.kind === "disable";
-      if (d.rules === null) {
-        allDisabled = disabled;
-        perRule.clear();
-      } else {
-        for (const r of d.rules) perRule.set(r, disabled);
-      }
-    }
-    return !(perRule.get(ruleId) ?? allDisabled);
-  });
+  }
+  const range = perRule.has(ruleId) ? perRule.get(ruleId) : all;
+  if (range) found.push(range);
+  for (const d of found) d.used.add(ruleId);
+  return found.length > 0;
+}
+
+/** The diagnostics that no directive suppresses. Diagnostics without a rule can't be suppressed. */
+export function applySuppressions(diagnostics: Diagnostic[], directives: readonly Directive[]): Diagnostic[] {
+  if (directives.length === 0) return diagnostics;
+  return diagnostics.filter(({ ruleId, start }) => !ruleId || !suppresses(directives, ruleId, start.line));
 }

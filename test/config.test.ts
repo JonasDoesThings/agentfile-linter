@@ -130,6 +130,7 @@ describe("config validation", () => {
     [{ categories: { gemini: "error" } }, /unknown category "gemini"/],
     [{ plugins: [] }, /unknown property "plugins"/],
     [{ overrides: [{ rules: {} }] }, /files must be a non-empty array/],
+    [{ reportUnnecessarySuppressions: "yes" }, /"reportUnnecessarySuppressions" must be a boolean/],
     [[], /must be a JSON object/],
   ])("%j is rejected", (raw, error) => {
     expect(() => parseConfig(raw, null, "/x")).toThrow(error);

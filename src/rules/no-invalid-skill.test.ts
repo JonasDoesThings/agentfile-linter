@@ -625,7 +625,20 @@ describe("agentfile/no-invalid-skill: configuration and output", () => {
     });
     expect(await summary(root)).toEqual([
       ".agents/skills/above/SKILL.md:2 Skill name `Bad_Name` must contain only lowercase letters, digits and hyphens",
+      `.agents/skills/above/SKILL.md:4 Unnecessary suppression of \`${RULE}\` in \`agentfile-linter-disable\` directive`,
+      `.agents/skills/enabled/SKILL.md:2 Unnecessary suppression of \`${RULE}\` in \`agentfile-linter-disable\` directive`,
       ".agents/skills/enabled/SKILL.md:4 Skill name `Bad_Name` must contain only lowercase letters, digits and hyphens",
+      `.agents/skills/enabled/SKILL.md:5 Unnecessary suppression of \`${RULE}\` in \`agentfile-linter-disable\` directive`,
+    ]);
+  });
+
+  test("a frontmatter disable that only covers the opening `---` is not unnecessary", async () => {
+    const root = makeProject({
+      ".agents/skills/missing/SKILL.md": skill("name: missing", `# agentfile-linter-disable ${RULE}`),
+    });
+    expect(await summary(root)).toEqual([]);
+    expect(await summary(makeProject({ ".agents/skills/missing/SKILL.md": skill("name: missing") }))).toEqual([
+      expect.stringMatching(/^\.agents\/skills\/missing\/SKILL\.md:1 /),
     ]);
   });
 

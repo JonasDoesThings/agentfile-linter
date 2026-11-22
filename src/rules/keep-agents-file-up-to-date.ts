@@ -60,6 +60,7 @@ export const keepAgentsFileUpToDate: Rule<KeepAgentsFileUpToDateOptions> = {
     description: "Context files must be revisited regularly (judged by their last Git commit or modification time)",
     categories: [],
     defaultSeverity: "warn",
+    timeDependent: true,
     schema: {
       type: "object",
       properties: {

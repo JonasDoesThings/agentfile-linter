@@ -108,6 +108,8 @@ Besides context files, [`agentfile/no-invalid-skill`](#agentfileno-invalid-skill
   },
   "overrides": [{ "files": ["packages/legacy/**"], "rules": { "no-missing-path": "off" } }],
   "ignorePatterns": ["vendor/"],
+  // Report inline directives that suppress nothing (default: true)
+  "reportUnnecessarySuppressions": true,
   // Replaces the default set of linted files
   "files": ["AGENTS.md", "CLAUDE.md", "GEMINI.md", ".github/copilot-instructions.md"],
 }
@@ -147,6 +149,14 @@ A directive with a name that isn't a rule (usually a typo, or a reason without t
 separator) suppresses nothing for that name. agentfile-linter reports each such name as an `info`
 diagnostic, with a suggestion when the name is close to a rule. Infos don't count as warnings or
 errors, so they don't change the exit code, and `--quiet` hides them.
+
+Directives that suppress nothing are reported as `info` too: a directive without rule names where no
+rule reports a problem, or a listed rule that reports no problem where the directive applies. Only
+rules that checked the file count, so a directive for a rule that is off (or that doesn't check this
+kind of file) is never reported. Neither is a directive that
+[`agentfile/keep-agents-file-up-to-date`](#agentfilekeep-agents-file-up-to-date) may need, because
+its problems depend on the current date. Set `"reportUnnecessarySuppressions": false` in the config
+to turn these reports off.
 
 ## Rules
 

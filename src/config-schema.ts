@@ -73,6 +73,11 @@ export function buildConfigSchema(): Record<string, unknown> {
         items: { type: "string" },
         description: "Gitignore-style patterns of files that are not linted.",
       },
+      reportUnnecessarySuppressions: {
+        type: "boolean",
+        default: true,
+        description: "Report inline suppression directives that suppress nothing, as info diagnostics.",
+      },
     },
   };
 }
