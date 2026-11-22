@@ -1,11 +1,18 @@
+import type { Root } from "mdast";
 import { CST, Lexer } from "yaml";
 
-import { resolveRuleName, RULES, suggestRuleName } from "#src/rules/index.ts";
+import type { RuleRegistry } from "#src/rules/index.ts";
 
 import { extractFrontmatter } from "./frontmatter.ts";
 import { visit } from "./markdown.ts";
 import { splitLines } from "./text.ts";
-import type { Diagnostic, LintedFile, Position } from "./types.ts";
+import type { Diagnostic, Position } from "./types.ts";
+
+/** A file's text and AST. */
+interface ParsedFile {
+  text: string;
+  ast: Root;
+}
 
 type DirectiveKind = "disable" | "enable" | "disable-line" | "disable-next-line";
 
@@ -57,13 +64,13 @@ interface ParsedRules {
 }
 
 /** Rule names of a directive (before an optional `-- reason`). */
-function parseRules(text: string): ParsedRules {
+function parseRules(text: string, registry: RuleRegistry): ParsedRules {
   const list = text.split(/\s--\s|^--\s/)[0] ?? "";
   if (!list.trim()) return { rules: null, names: [] };
   const rules = new Set<string>();
   const names: ParsedRules["names"] = [];
   for (const { 0: name, index } of list.matchAll(/[^\s,]+/g)) {
-    const rule = resolveRuleName(name);
+    const rule = registry.resolve(name);
     rules.add(rule ?? name);
     names.push({ name, rule, index });
   }
@@ -81,7 +88,7 @@ const nameRange = ({ name, rule }: ParsedRules["names"][number], start: Position
  * The frontmatter source and its first line. A closed block is the parser's `yaml` node. The parser
  * doesn't recognize an unclosed block, which most likely ends at the first blank line.
  */
-function frontmatterSource(file: Pick<LintedFile, "ast" | "text">): { source: string; firstLine: number } | null {
+function frontmatterSource(file: ParsedFile): { source: string; firstLine: number } | null {
   const first = file.ast.children[0];
   if (first?.type === "yaml") {
     return { source: splitLines(first.value).join("\n"), firstLine: (first.position?.start.line ?? 1) + 1 };
@@ -94,7 +101,7 @@ function frontmatterSource(file: Pick<LintedFile, "ast" | "text">): { source: st
 }
 
 /** Directives written as `#` comments in the frontmatter. */
-function frontmatterDirectives(file: Pick<LintedFile, "ast" | "text">): Directive[] {
+function frontmatterDirectives(file: ParsedFile, registry: RuleRegistry): Directive[] {
   const frontmatter = frontmatterSource(file);
   if (!frontmatter) return [];
   const directives: Directive[] = [];
@@ -104,7 +111,7 @@ function frontmatterDirectives(file: Pick<LintedFile, "ast" | "text">): Directiv
     if (!match) continue;
     const kind = match[1] as DirectiveKind;
     const list = match[2] as string;
-    const parsed = parseRules(list);
+    const parsed = parseRules(list, registry);
     const line = frontmatter.firstLine + comment.line;
     // A comment runs to the end of its line; the rule list ends it.
     const sourceLine = lines[comment.line] ?? "";
@@ -135,8 +142,8 @@ function frontmatterDirectives(file: Pick<LintedFile, "ast" | "text">): Directiv
  * Frontmatter has to start on the first line, so it takes the directives as `#` comments
  * instead, and a `disable` there also covers the opening `---`.
  */
-export function collectDirectives(file: Pick<LintedFile, "ast" | "text">): Directive[] {
-  const directives = frontmatterDirectives(file);
+export function collectDirectives(file: ParsedFile, registry: RuleRegistry): Directive[] {
+  const directives = frontmatterDirectives(file, registry);
   let sourceLines: string[] | undefined;
   visit(file.ast, "html", (node) => {
     const nodeStart = node.position?.start ?? { line: 1, column: 1 };
@@ -157,7 +164,7 @@ export function collectDirectives(file: Pick<LintedFile, "ast" | "text">): Direc
       const start = positionAt(match.index);
       const list = match[2] as string;
       const listOffset = match.index + match[0].length - "-->".length - list.length;
-      const parsed = parseRules(list);
+      const parsed = parseRules(list, registry);
       directives.push({
         kind: match[1] as DirectiveKind,
         rules: parsed.rules,
@@ -177,11 +184,15 @@ export function collectDirectives(file: Pick<LintedFile, "ast" | "text">): Direc
  * Info diagnostics for names in directives that are not rules. Such a directive suppresses
  * nothing for that name, which is easy to miss when the name has a typo.
  */
-export function unknownRuleDiagnostics(filePath: string, directives: readonly Directive[]): Diagnostic[] {
+export function unknownRuleDiagnostics(
+  filePath: string,
+  directives: readonly Directive[],
+  registry: RuleRegistry,
+): Diagnostic[] {
   return directives.flatMap((directive) =>
     directive.names.flatMap(({ name, rule, start, end }): Diagnostic[] => {
       if (rule) return [];
-      const suggestion = suggestRuleName(name);
+      const suggestion = registry.suggest(name);
       return [
         {
           ruleId: null,
@@ -217,9 +228,10 @@ export function unnecessarySuppressionDiagnostics(
   filePath: string,
   directives: readonly Directive[],
   checkedBy: ReadonlySet<string>,
+  registry: RuleRegistry,
 ): Diagnostic[] {
   // Problems of a rule that depends on the current time come and go while the file stays the same.
-  const isStable = (rule: string) => checkedBy.has(rule) && !RULES.get(rule)?.meta.timeDependent;
+  const isStable = (rule: string) => checkedBy.has(rule) && !registry.get(rule)?.meta?.timeDependent;
   const allStable = checkedBy.size > 0 && [...checkedBy].every(isStable);
   const diagnostics: Diagnostic[] = [];
   for (const directive of directives) {

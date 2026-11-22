@@ -7,13 +7,21 @@
   },
   "files": [
     "dist/cli.js",
+    "dist/types",
     "configuration_schema.json"
   ],
   "type": "module",
+  "types": "./dist/types/plugin-types.d.ts",
   "imports": {
     "#src/*": "./src/*",
     "#test/*": "./test/*",
     "#package.json": "./package.json"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/types/plugin-types.d.ts"
+    },
+    "./package.json": "./package.json"
   },
   "scripts": {
     "dev": "bun run src/cli.ts",
@@ -32,6 +40,8 @@
     "check": "bun run fmt:check && bun run lint && bun run typecheck && bun test && bun run lint:self"
   },
   "dependencies": {
+    "@types/mdast": "^4.0.4",
+    "esquery": "^1.6.0",
     "github-slugger": "^2.0.0",
     "ignore": "^7.0.16",
     "jsonc-parser": "^3.3.1",
@@ -46,8 +56,10 @@
     "yaml": "^2.9.1"
   },
   "devDependencies": {
+    "@eslint/markdown": "^9.0.0",
+    "@oxlint/plugins": "1.94.0",
     "@types/bun": "^1.4.5",
-    "@types/mdast": "^4.0.4",
+    "@types/esquery": "^1.5.4",
     "oxfmt": "^0.79.0",
     "oxlint": "^1.94.0",
     "oxlint-tsgolint": "^7.0.2008",

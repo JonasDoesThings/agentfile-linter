@@ -297,79 +297,86 @@ export function findImports(text: string): { path: string; index: number }[] {
   return out;
 }
 
-export const noMissingPath: Rule<NoMissingPathOptions> = {
+export const noMissingPath: Rule<[NoMissingPathOptions]> = {
   meta: {
-    name: "agentfile/no-missing-path",
-    description: "Referenced files and directories (in code spans and @imports) must exist",
-    categories: ["recommended"],
-    defaultSeverity: "error",
-    schema: {
-      type: "object",
-      properties: {
-        ignore: {
-          type: "array",
-          items: { type: "string" },
-          description: "Glob patterns of referenced paths to skip.",
-        },
-        allowSuffixMatch: {
-          type: "boolean",
-          description:
-            "Accept a path if any project path ends with it (e.g. `components/Button.tsx` matches `apps/web/src/components/Button.tsx`).",
-        },
-        checkImports: {
-          type: "boolean",
-          description: "Check `@path/to/file.md` imports used by CLAUDE.md and GEMINI.md.",
-        },
-      },
+    docs: {
+      description: "Referenced files and directories (in code spans and @imports) must exist",
+      recommended: true,
+      category: "correctness",
     },
+    schema: [
+      {
+        type: "object",
+        properties: {
+          ignore: {
+            type: "array",
+            items: { type: "string" },
+            description: "Glob patterns of referenced paths to skip.",
+          },
+          allowSuffixMatch: {
+            type: "boolean",
+            description:
+              "Accept a path if any project path ends with it (e.g. `components/Button.tsx` matches `apps/web/src/components/Button.tsx`).",
+          },
+          checkImports: {
+            type: "boolean",
+            description: "Check `@path/to/file.md` imports used by CLAUDE.md and GEMINI.md.",
+          },
+        },
+        additionalProperties: false,
+      },
+    ],
+    defaultOptions: [{ ignore: [], allowSuffixMatch: true, checkImports: true }],
   },
-  defaultOptions: { ignore: [], allowSuffixMatch: true, checkImports: true },
-  check({ file, project, options, report }) {
-    const fileDir = dirname(file.path);
+  create(context) {
+    const { sourceCode, project, report } = context;
+    const [options] = context.options;
+    const fileDir = dirname(context.filename);
     const ignoreGlobs = options.ignore.map((p) => new Glob(p));
     const isIgnoredByOption = (p: string) => ignoreGlobs.some((g) => g.match(p));
     let exampleFiles: Set<string> | undefined;
 
-    visit(file.ast, "inlineCode", (node, ancestors) => {
-      if (insideLink(ancestors)) return; // covered by agentfile/no-broken-reference
-      const candidate = classifyPathCandidate(node.value);
-      if (!candidate || isIgnoredByOption(candidate.path) || isIgnoredByOption(node.value.trim())) return;
-      exampleFiles ??= exampleFilesFromCodeFences(file.ast);
-      if (exampleFiles.has(candidate.path) || isExampleContext(node, ancestors)) return;
-      const resolution = resolvePathCandidate(candidate, fileDir, project, options.allowSuffixMatch);
-      if (resolution.ok) return;
-      const { start, end } = locateInNode(file.text, file.lineStarts, node, node.value);
-      report({
-        message: candidate.glob
-          ? `No files match the glob \`${node.value.trim()}\``
-          : `${candidate.isDir ? "Directory" : "Path"} \`${node.value.trim()}\` does not exist`,
-        help: resolution.suggestions.length
-          ? `Did you mean ${resolution.suggestions.map((s) => `\`${s}\``).join(", ")}?`
-          : "Paths are resolved against this file's directory and its parents up to the project root.",
-        start,
-        end,
-      });
-    });
-
-    if (!options.checkImports) return;
-    visit(file.ast, "text", (node, ancestors) => {
-      if (insideLink(ancestors)) return;
-      for (const imp of findImports(node.value)) {
-        if (imp.path.startsWith("~")) continue;
-        if (isIgnoredByOption(imp.path)) continue;
-        const abs = join(fileDir, imp.path);
-        if (project.exists(abs) || project.isIgnored(abs)) continue;
-        const { start, end } = locateInNode(file.text, file.lineStarts, node, `@${imp.path}`);
-        const suggestions = project.findBySuffix(basename(imp.path), "file", 3);
+    return {
+      inlineCode(node) {
+        const candidate = classifyPathCandidate(node.value);
+        if (!candidate || isIgnoredByOption(candidate.path) || isIgnoredByOption(node.value.trim())) return;
+        const ancestors = sourceCode.getAncestors(node);
+        if (insideLink(ancestors)) return; // covered by agentfile/no-broken-reference
+        exampleFiles ??= exampleFilesFromCodeFences(sourceCode.ast);
+        if (exampleFiles.has(candidate.path) || isExampleContext(node, ancestors)) return;
+        const resolution = resolvePathCandidate(candidate, fileDir, project, options.allowSuffixMatch);
+        if (resolution.ok) return;
+        const { start, end } = locateInNode(sourceCode, node, node.value);
         report({
-          message: `Imported file \`@${imp.path}\` does not exist`,
-          help: suggestions.length
-            ? `Imports are resolved relative to this file. Did you mean ${suggestions.map((s) => `\`${s}\``).join(", ")}?`
-            : "Imports are resolved relative to this file's directory.",
-          start,
-          end,
+          message: candidate.glob
+            ? `No files match the glob \`${node.value.trim()}\``
+            : `${candidate.isDir ? "Directory" : "Path"} \`${node.value.trim()}\` does not exist`,
+          help: resolution.suggestions.length
+            ? `Did you mean ${resolution.suggestions.map((s) => `\`${s}\``).join(", ")}?`
+            : "Paths are resolved against this file's directory and its parents up to the project root.",
+          loc: { start, end },
         });
-      }
-    });
+      },
+      text(node) {
+        if (!options.checkImports) return;
+        const imports = findImports(node.value);
+        if (imports.length === 0 || insideLink(sourceCode.getAncestors(node))) return;
+        for (const imp of imports) {
+          if (imp.path.startsWith("~")) continue;
+          if (isIgnoredByOption(imp.path)) continue;
+          const abs = join(fileDir, imp.path);
+          if (project.exists(abs) || project.isIgnored(abs)) continue;
+          const { start, end } = locateInNode(sourceCode, node, `@${imp.path}`);
+          const suggestions = project.findBySuffix(basename(imp.path), "file", 3);
+          report({
+            message: `Imported file \`@${imp.path}\` does not exist`,
+            help: suggestions.length
+              ? `Imports are resolved relative to this file. Did you mean ${suggestions.map((s) => `\`${s}\``).join(", ")}?`
+              : "Imports are resolved relative to this file's directory.",
+            loc: { start, end },
+          });
+        }
+      },
+    };
   },
 };

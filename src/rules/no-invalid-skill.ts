@@ -4,7 +4,7 @@ import { extractFrontmatter, isFrontmatterDelimiter, parseFrontmatter } from "#s
 import { Glob } from "#src/glob.ts";
 import { ALWAYS_SKIPPED_DIRS, isWithin, type Project, tryRealpath } from "#src/project.ts";
 import { closest, lineRange, splitLines } from "#src/text.ts";
-import type { Position, ReportDescriptor, Rule, TreeDiscoveryContext, TreeInput } from "#src/types.ts";
+import type { ReportDescriptor, Rule, SourceLocation, TreeDiscoveryContext, TreeInput } from "#src/types.ts";
 import { isRecord } from "#src/util.ts";
 
 export interface NoInvalidSkillOptions {
@@ -166,7 +166,7 @@ interface SkillRoot {
 
 type LayoutProblem = Pick<ReportDescriptor, "message" | "help">;
 type SkillInput = TreeInput & ({ problem: LayoutProblem } | { options: NoInvalidSkillOptions; project: Project });
-type SkillReporter = (descriptor: Omit<ReportDescriptor, "start"> & { start?: Position }) => void;
+type SkillReporter = (descriptor: ReportDescriptor) => void;
 
 class SkillDiscovery {
   private readonly globs = new Map<string, Glob>();
@@ -174,7 +174,7 @@ class SkillDiscovery {
   private readonly explicitFileAncestors = new Set<string>();
   private readonly inputs = new Map<string, SkillInput>();
 
-  constructor(private readonly ctx: TreeDiscoveryContext<NoInvalidSkillOptions>) {
+  constructor(private readonly ctx: TreeDiscoveryContext<[NoInvalidSkillOptions]>) {
     this.explicitFiles = new Set(ctx.explicitFiles);
     for (const path of ctx.explicitFiles) {
       for (let dir = dirname(path); ; dir = dirname(dir)) {
@@ -187,8 +187,8 @@ class SkillDiscovery {
   find(): SkillInput[] {
     const patterns = [
       ...new Set(
-        this.ctx.discoveryOptions.flatMap(({ directories }) =>
-          (directories ?? []).map((pattern) => pattern.replace(/^\.?\//, "").replace(/\/$/, "")),
+        this.ctx.discoveryOptions.flatMap(([{ directories }]) =>
+          directories.map((pattern) => pattern.replace(/^\.?\//, "").replace(/\/$/, "")),
         ),
       ),
     ];
@@ -268,7 +268,7 @@ class SkillDiscovery {
   /** Options for a selected file in a skills root, as the overrides matching the file or the root set them. */
   private selectedOptions(root: SkillRoot, path: string): NoInvalidSkillOptions | null {
     if (!this.isSelected(path)) return null;
-    const options = this.ctx.optionsFor(path, root.path);
+    const [options] = this.ctx.optionsFor(path, root.path);
     return this.isSkillsRoot(root, options.directories) ? options : null;
   }
 
@@ -413,13 +413,13 @@ function checkSkillFile(
       report({
         message: "Frontmatter must start on the first line, or agents treat it as plain text",
         help: "Remove the blank lines before the opening `---`.",
-        ...at(late),
+        loc: at(late),
       });
     } else if (options.spec) {
       report({
         message: `\`${SKILL_FILE}\` has no frontmatter with \`name\` and \`description\``,
         help: `Start the file with a frontmatter block: a \`---\` line, \`name: ${dirName}\`, \`description: <what the skill does and when to use it>\` and a closing \`---\` line.`,
-        ...at(1),
+        loc: at(1),
       });
     }
     return;
@@ -428,7 +428,7 @@ function checkSkillFile(
     report({
       message: "Frontmatter is not closed",
       help: "End the frontmatter with a `---` line before the Markdown content.",
-      ...at(1),
+      loc: at(1),
     });
     return;
   }
@@ -442,7 +442,7 @@ function checkSkillFile(
     report({
       message: "Frontmatter is not valid YAML",
       help: parsed.help + tolerated,
-      ...at(parsed.line),
+      loc: at(parsed.line),
     });
     return;
   }
@@ -450,7 +450,7 @@ function checkSkillFile(
   if (!isRecord(data)) {
     report({
       message: "Frontmatter must be a mapping of `key: value` pairs",
-      ...at(frontmatter.firstLine),
+      loc: at(frontmatter.firstLine),
     });
     return;
   }
@@ -458,7 +458,7 @@ function checkSkillFile(
     report({
       message: key === undefined ? "Duplicate frontmatter key" : `Duplicate frontmatter field \`${key}\``,
       help: "YAML forbids duplicate keys; many parsers silently keep only the last value.",
-      ...at(line),
+      loc: at(line),
     });
   }
   checkFields(parsed.keyLines, data, options, dirName, at, report);
@@ -469,7 +469,7 @@ function checkFields(
   data: Record<string, unknown>,
   options: NoInvalidSkillOptions,
   dirName: string,
-  at: (line: number) => { start: Position; end: Position },
+  at: (line: number) => SourceLocation,
   report: SkillReporter,
 ): void {
   const lineOf = (key: string) => keyLines.get(key) ?? 1;
@@ -482,26 +482,26 @@ function checkFields(
         report({
           message: `Unknown frontmatter field \`${key}\`; did you mean \`${suggestion}\`?`,
           help: "Agents ignore unknown fields, so this setting has no effect.",
-          ...at(lineOf(key)),
+          loc: at(lineOf(key)),
         });
       }
       continue;
     }
     const problem = value === null ? "has no value" : check(value);
-    if (problem) report({ message: `\`${key}\` ${problem}`, ...at(lineOf(key)) });
+    if (problem) report({ message: `\`${key}\` ${problem}`, loc: at(lineOf(key)) });
   }
 
   const str = (key: string) => (isScalar(data[key]) ? String(data[key]).trim() : undefined);
   const description = str("description");
   if (description === "") {
-    report({ message: "`description` must not be empty", ...at(lineOf("description")) });
+    report({ message: "`description` must not be empty", loc: at(lineOf("description")) });
   }
   const compatibility = str("compatibility");
   const compatibilityLength = Array.from(compatibility ?? "").length;
   if (compatibilityLength > COMPATIBILITY_MAX) {
     report({
       message: `\`compatibility\` must be at most ${COMPATIBILITY_MAX} characters long (it has ${compatibilityLength})`,
-      ...at(lineOf("compatibility")),
+      loc: at(lineOf("compatibility")),
     });
   }
   if (!options.spec) return;
@@ -512,18 +512,18 @@ function checkFields(
     report({
       message: "Frontmatter is missing `name`",
       help: `Add \`name: ${dirName}\`. ${specHelp}`,
-      ...at(1),
+      loc: at(1),
     });
   } else if (name !== undefined) {
     const normalized = name.normalize("NFKC");
     const problem = normalized === "" ? "must not be empty" : nameProblem(normalized);
     if (problem) {
-      report({ message: `Skill name \`${name}\` ${problem}`, help: specHelp, ...at(lineOf("name")) });
+      report({ message: `Skill name \`${name}\` ${problem}`, help: specHelp, loc: at(lineOf("name")) });
     } else if (normalized !== dirName.normalize("NFKC")) {
       report({
         message: `Skill name \`${name}\` does not match its directory \`${dirName}\``,
         help: "Rename the directory or change `name`. Several agents (e.g. Cursor, VS Code) skip skills whose name differs.",
-        ...at(lineOf("name")),
+        loc: at(lineOf("name")),
       });
     }
   }
@@ -532,48 +532,52 @@ function checkFields(
     report({
       message: "Frontmatter is missing `description`",
       help: `Describe what the skill does and when to use it; agents choose skills by their description. ${specHelp}`,
-      ...at(1),
+      loc: at(1),
     });
   } else if (descriptionLength > DESCRIPTION_MAX) {
     report({
       message: `\`description\` must be at most ${DESCRIPTION_MAX} characters long (it has ${descriptionLength})`,
       help: specHelp,
-      ...at(lineOf("description")),
+      loc: at(lineOf("description")),
     });
   }
 }
 
-export const noInvalidSkill: Rule<NoInvalidSkillOptions, SkillInput> = {
+export const noInvalidSkill: Rule<[NoInvalidSkillOptions], SkillInput> = {
   meta: {
-    name: "agentfile/no-invalid-skill",
-    description: "Skill directories must have a valid layout and SKILL.md files valid frontmatter",
-    categories: ["recommended"],
-    defaultSeverity: "error",
-    schema: {
-      type: "object",
-      properties: {
-        directories: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "Glob patterns of skills directories, relative to the project root. `skills/` directories of Claude Code plugins are always checked.",
-        },
-        spec: {
-          type: "boolean",
-          description:
-            "Enforce the Agent Skills specification: required `name` and `description`, name format and length, name matching the directory.",
-        },
-      },
+    docs: {
+      description: "Skill directories must have a valid layout and SKILL.md files valid frontmatter",
+      recommended: true,
+      category: "correctness",
     },
+    schema: [
+      {
+        type: "object",
+        properties: {
+          directories: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              "Glob patterns of skills directories, relative to the project root. `skills/` directories of Claude Code plugins are always checked.",
+          },
+          spec: {
+            type: "boolean",
+            description:
+              "Enforce the Agent Skills specification: required `name` and `description`, name format and length, name matching the directory.",
+          },
+        },
+        additionalProperties: false,
+      },
+    ],
+    defaultOptions: [{ directories: DEFAULT_SKILL_DIRECTORIES, spec: true }],
   },
-  defaultOptions: { directories: DEFAULT_SKILL_DIRECTORIES, spec: true },
   collectTreeInputs(ctx) {
     return new SkillDiscovery(ctx).find();
   },
   checkTree(ctx) {
     for (const input of ctx.treeInputs) {
       const { path } = input;
-      const report: SkillReporter = (descriptor) => ctx.report(path, { start: { line: 1, column: 1 }, ...descriptor });
+      const report: SkillReporter = (descriptor) => ctx.report(path, descriptor);
       if ("problem" in input) {
         report(input.problem);
       } else {

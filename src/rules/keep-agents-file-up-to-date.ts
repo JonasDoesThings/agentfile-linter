@@ -1,10 +1,10 @@
 import { basename } from "node:path";
 
 import { hasUncommittedChanges, lastCommitTime, readIndex } from "#src/git.ts";
-import type { Project } from "#src/project.ts";
+import { type Project, tryRealpath } from "#src/project.ts";
 import { countSchema } from "#src/schema.ts";
 import { firstLineRange } from "#src/text.ts";
-import type { Rule } from "#src/types.ts";
+import type { Rule, RuleContext } from "#src/types.ts";
 
 export interface KeepAgentsFileUpToDateOptions {
   /** Days without a change to the file after which it is reported. */
@@ -43,59 +43,71 @@ function modification(path: string, project: Project): LastUpdate | null {
   return { time, date: utcDate(time), source: "modification" };
 }
 
-export const keepAgentsFileUpToDate: Rule<KeepAgentsFileUpToDateOptions> = {
+export const keepAgentsFileUpToDate: Rule<[KeepAgentsFileUpToDateOptions]> = {
   meta: {
-    name: "agentfile/keep-agents-file-up-to-date",
-    description: "Context files must be revisited regularly (judged by their last Git commit or modification time)",
-    categories: [],
-    defaultSeverity: "warn",
-    timeDependent: true,
-    schema: {
-      type: "object",
-      properties: {
-        warnIfNotUpdatedForDays: countSchema(
-          "Report files not changed for more than this many days (by last commit, or by modification time for files without Git history).",
-        ),
-        warnOnlyForFilesLongerThanChars: countSchema(
-          "Skip files with at most this many characters (ignoring surrounding whitespace), e.g. `@AGENTS.md` pointers.",
-        ),
-      },
+    docs: {
+      description: "Context files must be revisited regularly (judged by their last Git commit or modification time)",
+      category: "pedantic",
     },
+    timeDependent: true,
+    schema: [
+      {
+        type: "object",
+        properties: {
+          warnIfNotUpdatedForDays: countSchema(
+            "Report files not changed for more than this many days (by last commit, or by modification time for files without Git history).",
+          ),
+          warnOnlyForFilesLongerThanChars: countSchema(
+            "Skip files with at most this many characters (ignoring surrounding whitespace), e.g. `@AGENTS.md` pointers.",
+          ),
+        },
+        additionalProperties: false,
+      },
+    ],
+    defaultOptions: [{ warnIfNotUpdatedForDays: 120, warnOnlyForFilesLongerThanChars: 0 }],
   },
-  defaultOptions: { warnIfNotUpdatedForDays: 120, warnOnlyForFilesLongerThanChars: 0 },
-  async check({ file, project, options, report }) {
-    if (file.text.trim().length <= Number(options.warnOnlyForFilesLongerThanChars)) return;
-    const maxDays = Number(options.warnIfNotUpdatedForDays);
-    const daysSince = (update: LastUpdate) => Math.floor((Date.now() / 1000 - update.time) / DAY_SECONDS);
-    // When a file was last changed: its last commit, or, for files without Git history, its
-    // modification time. Checkouts of other version control systems write files with the
-    // checkout time, so a modification time is never older than the last real change.
-    // A symlinked file's content (and history) lives in its target.
-    const commit = await lastCommitTime(file.realPath);
-    let update: LastUpdate | null = commit ? { ...commit, source: "commit" } : modification(file.realPath, project);
-    // Most files are recent, so the index is only read for old ones.
-    if (update === null || daysSince(update) <= maxDays) return;
-    const index = await readIndex(file.realPath);
-    if (index.kind === "unmerged") return;
-    // An untracked file can still have history from a deleted file at the same path.
-    if (index.kind !== "tracked" && update.source === "commit") {
-      update = modification(file.realPath, project);
-      if (update === null || daysSince(update) <= maxDays) return;
-    }
-    const days = daysSince(update);
-    const mode = project.stat(file.realPath)?.mode;
-    if (mode === undefined || (await hasUncommittedChanges(file.realPath, index, mode, project))) return;
-
-    const name = basename(file.path);
-    const limit = `the ${maxDays}-day limit (\`warnIfNotUpdatedForDays\`)`;
-    const byCommit = update.source === "commit";
-    report({
-      message: `\`${name}\` has not been updated in ${days} days (${byCommit ? "last commit" : "last modified"}: ${update.date})`,
-      help: byCommit
-        ? `Agent instructions go stale as the project changes. Review the file and commit any updates, even a small one, to reset ${limit}.`
-        : `Agent instructions go stale as the project changes. Review the file and update it (or \`touch\` it if it is ` +
-          `still accurate) to reset ${limit}. It has no Git history, so its modification time counts.`,
-      ...firstLineRange(file.text),
-    });
+  create(context) {
+    // Runs Git, so the check is asynchronous (an agentfile-linter extension).
+    return { root: () => check(context) };
   },
 };
+
+async function check(context: RuleContext<[KeepAgentsFileUpToDateOptions]>): Promise<void> {
+  const { filename: path, project, report } = context;
+  const { text } = context.sourceCode;
+  const [options] = context.options;
+  if (text.trim().length <= Number(options.warnOnlyForFilesLongerThanChars)) return;
+  const maxDays = Number(options.warnIfNotUpdatedForDays);
+  const daysSince = (update: LastUpdate) => Math.floor((Date.now() / 1000 - update.time) / DAY_SECONDS);
+  // When a file was last changed: its last commit, or, for files without Git history, its
+  // modification time. Checkouts of other version control systems write files with the
+  // checkout time, so a modification time is never older than the last real change.
+  // A symlinked file's content (and history) lives in its target.
+  const realPath = tryRealpath(path) ?? path;
+  const commit = await lastCommitTime(realPath);
+  let update: LastUpdate | null = commit ? { ...commit, source: "commit" } : modification(realPath, project);
+  // Most files are recent, so the index is only read for old ones.
+  if (update === null || daysSince(update) <= maxDays) return;
+  const index = await readIndex(realPath);
+  if (index.kind === "unmerged") return;
+  // An untracked file can still have history from a deleted file at the same path.
+  if (index.kind !== "tracked" && update.source === "commit") {
+    update = modification(realPath, project);
+    if (update === null || daysSince(update) <= maxDays) return;
+  }
+  const days = daysSince(update);
+  const mode = project.stat(realPath)?.mode;
+  if (mode === undefined || (await hasUncommittedChanges(realPath, index, mode, project))) return;
+
+  const name = basename(path);
+  const limit = `the ${maxDays}-day limit (\`warnIfNotUpdatedForDays\`)`;
+  const byCommit = update.source === "commit";
+  report({
+    message: `\`${name}\` has not been updated in ${days} days (${byCommit ? "last commit" : "last modified"}: ${update.date})`,
+    help: byCommit
+      ? `Agent instructions go stale as the project changes. Review the file and commit any updates, even a small one, to reset ${limit}.`
+      : `Agent instructions go stale as the project changes. Review the file and update it (or \`touch\` it if it is ` +
+        `still accurate) to reset ${limit}. It has no Git history, so its modification time counts.`,
+    loc: firstLineRange(text),
+  });
+}

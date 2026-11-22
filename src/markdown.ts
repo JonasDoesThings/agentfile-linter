@@ -7,7 +7,7 @@ import { toString } from "mdast-util-to-string";
 import { frontmatter } from "micromark-extension-frontmatter";
 import { gfm } from "micromark-extension-gfm";
 
-import type { Position } from "./types.ts";
+import type { NodeOfType, Position } from "./types.ts";
 
 export function parseMarkdown(text: string): Root {
   return fromMarkdown(text, {
@@ -15,8 +15,6 @@ export function parseMarkdown(text: string): Root {
     mdastExtensions: [gfmFromMarkdown(), frontmatterFromMarkdown(["yaml", "toml"])],
   });
 }
-
-type NodeOfType<T extends Nodes["type"]> = Extract<Nodes, { type: T }>;
 
 /**
  * Visits every node of the given type (depth-first, document order).
@@ -70,8 +68,7 @@ export function positionToOffset(lineStarts: number[], pos: Position): number {
  * (e.g. because of escapes in the source).
  */
 export function locateInNode(
-  text: string,
-  lineStarts: number[],
+  { text, lineStartIndices }: { text: string; lineStartIndices: number[] },
   node: Nodes,
   needle: string,
   fromOffset?: number,
@@ -88,8 +85,8 @@ export function locateInNode(
     return { start, end, offset: startOffset };
   }
   return {
-    start: offsetToPosition(lineStarts, idx),
-    end: offsetToPosition(lineStarts, idx + needle.length),
+    start: offsetToPosition(lineStartIndices, idx),
+    end: offsetToPosition(lineStartIndices, idx + needle.length),
     offset: idx,
   };
 }

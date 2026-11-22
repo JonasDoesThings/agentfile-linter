@@ -110,3 +110,13 @@ export function runRule(root: string, rule: string, options: Omit<LintOptions, "
 }
 
 export const messages = (diagnostics: SimpleDiagnostic[]) => diagnostics.map((d) => d.message);
+
+/** The message of the error `promise` rejects with. */
+export async function rejection(promise: Promise<unknown>): Promise<string> {
+  try {
+    await promise;
+  } catch (error) {
+    return (error as Error).message;
+  }
+  throw new Error("Expected the promise to reject");
+}

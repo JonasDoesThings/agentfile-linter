@@ -46,23 +46,25 @@ agentfile-linter --init                  # create .agentfile-linterrc.json
 agentfile-linter --debug files           # print the files that would be linted, then exit
 ```
 
-With no config file and no rule flags, every rule in the `recommended` category runs as an `error`.
+With no config file and no rule flags, every rule marked as recommended in the table below runs as an `error`.
 
 ### Rules
 
-| Rule                                                                             | Category    | Checks                                                                    |
-| -------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------- |
-| [`agentfile/no-missing-path`](#agentfileno-missing-path)                         | recommended | Referenced files and directories exist                                    |
-| [`agentfile/no-missing-script`](#agentfileno-missing-script)                     | recommended | Documented scripts and tasks (npm, make, just, uv, maven, cargo, …) exist |
-| [`agentfile/no-broken-reference`](#agentfileno-broken-reference)                 | recommended | Relative links, images, `#anchors` and `#L42` line fragments resolve      |
-| [`agentfile/no-agent-files-drift`](#agentfileno-agent-files-drift)               | recommended | Agent files in one directory are identical or symlinked                   |
-| [`agentfile/no-invalid-skill`](#agentfileno-invalid-skill)                       | recommended | Skill directories have a valid layout and valid `SKILL.md` frontmatter    |
-| [`agentfile/no-misnamed-agent-file`](#agentfileno-misnamed-agent-file)           | recommended | Agent files are spelled in the exact case agents look for                 |
-| [`agentfile/no-unnecessary-agent-files`](#agentfileno-unnecessary-agent-files)   | –           | No `CLAUDE.md` that only mirrors `AGENTS.md`                              |
-| [`agentfile/keep-agents-file-up-to-date`](#agentfilekeep-agents-file-up-to-date) | –           | Context files were changed recently                                       |
-| [`agentfile/limit-file-size`](#agentfilelimit-file-size)                         | –           | Context files stay below a maximum number of characters                   |
+| Rule                                                                             | Recommended | Category    | Checks                                                                    |
+| -------------------------------------------------------------------------------- | ----------- | ----------- | ------------------------------------------------------------------------- |
+| [`agentfile/no-missing-path`](#agentfileno-missing-path)                         | ✓           | correctness | Referenced files and directories exist                                    |
+| [`agentfile/no-missing-script`](#agentfileno-missing-script)                     | ✓           | correctness | Documented scripts and tasks (npm, make, just, uv, maven, cargo, …) exist |
+| [`agentfile/no-broken-reference`](#agentfileno-broken-reference)                 | ✓           | correctness | Relative links, images, `#anchors` and `#L42` line fragments resolve      |
+| [`agentfile/no-agent-files-drift`](#agentfileno-agent-files-drift)               | ✓           | suspicious  | Agent files in one directory are identical or symlinked                   |
+| [`agentfile/no-invalid-skill`](#agentfileno-invalid-skill)                       | ✓           | correctness | Skill directories have a valid layout and valid `SKILL.md` frontmatter    |
+| [`agentfile/no-misnamed-agent-file`](#agentfileno-misnamed-agent-file)           | ✓           | correctness | Agent files are spelled in the exact case agents look for                 |
+| [`agentfile/no-unnecessary-agent-files`](#agentfileno-unnecessary-agent-files)   |             | pedantic    | No `CLAUDE.md` that only mirrors `AGENTS.md`                              |
+| [`agentfile/keep-agents-file-up-to-date`](#agentfilekeep-agents-file-up-to-date) |             | pedantic    | Context files were changed recently                                       |
+| [`agentfile/limit-file-size`](#agentfilelimit-file-size)                         |             | pedantic    | Context files stay below a maximum number of characters                   |
 
-Rules in the `recommended` category run by default. The others are off until you enable them in `rules`, e.g. `"agentfile/keep-agents-file-up-to-date": "warn"`.
+The rules that aren't recommended are off until you enable them in `rules`, e.g. `"agentfile/keep-agents-file-up-to-date": "warn"`, or by their category.
+
+Each rule belongs to one category, named as in [Oxlint](https://oxc.rs/docs/guide/usage/linter/rules.html): `correctness` (instructions that are wrong), `suspicious` (most likely wrong) and `pedantic` (stricter, with occasional false positives). `style`, `perf`, `restriction` and `nursery` have no rules yet. `"categories": { "pedantic": "warn" }` in the config or `-W pedantic` on the command line sets the severity of all rules in a category. `recommended` works the same way for the recommended rules.
 
 ### Linted files
 
@@ -91,7 +93,7 @@ Besides context files, [`agentfile/no-invalid-skill`](#agentfileno-invalid-skill
 | `--silent`               | Print no diagnostics                                                                                     |
 | `--print-config`         | Print the effective configuration                                                                        |
 | `--debug=<options>`      | Debug output, comma-separated. `files`: print the files that would be linted, then exit                  |
-| `--rules`                | List all rules                                                                                           |
+| `--rules`                | List all rules, including those of `jsPlugins`. Config problems are printed below the list               |
 
 `-A`/`-W`/`-D` are applied left to right, after the config file. A rule name can be written with or without its `agentfile/` prefix.
 
@@ -116,6 +118,10 @@ Besides context files, [`agentfile/no-invalid-skill`](#agentfileno-invalid-skill
   "reportUnnecessarySuppressions": true,
   // Replaces the default set of linted files
   "files": ["AGENTS.md", "CLAUDE.md", "GEMINI.md", ".github/copilot-instructions.md"],
+  // Plugins with custom rules, see "Plugins" below
+  "jsPlugins": ["./lint/agentfile-plugin.js"],
+  // Shared with all rules as `context.settings`
+  "settings": {},
 }
 ```
 
@@ -161,6 +167,102 @@ kind of file) is never reported. Neither is a directive that
 [`agentfile/keep-agents-file-up-to-date`](#agentfilekeep-agents-file-up-to-date) may need, because
 its problems depend on the current date. Set `"reportUnnecessarySuppressions": false` in the config
 to turn these reports off.
+
+## Plugins
+
+Custom rules come from plugins in the format of [ESLint](https://eslint.org/docs/latest/extend/plugins)
+and [Oxlint JS plugins](https://oxc.rs/docs/guide/usage/linter/js-plugins.html), loaded with
+Oxlint's `jsPlugins` setting. Rules check the [mdast](https://github.com/syntax-tree/mdast) of
+each context file, the AST that ESLint's Markdown language (`@eslint/markdown`) uses too, so
+the rules of `@eslint/markdown` run unchanged:
+
+```jsonc
+{
+  "jsPlugins": [
+    "./lint/agentfile-plugin.js", // a path, relative to the config file
+    "eslint-plugin-example", // a package, from node_modules
+    { "name": "markdown", "specifier": "@eslint/markdown" }, // a package under another name
+  ],
+  "rules": {
+    "markdown/no-empty-links": "error",
+    "example/some-rule": ["warn", { "option": true }],
+  },
+}
+```
+
+A plugin is named by the `name` of its entry, else by its `meta.name`, else by its package name,
+without an `eslint-plugin-` or `oxlint-plugin-` prefix (`eslint-plugin-foo` becomes `foo`,
+`@scope/eslint-plugin-foo` becomes `@scope/foo`). Its rules are named `<plugin>/<rule>`. `agentfile`
+is taken by the built-in rules. `overrides` can have `jsPlugins` too; their rules can be configured
+anywhere. Plugins may be written in TypeScript (with Node.js 22.18 or newer, or the standalone
+executable).
+
+Plugin rules are off until they are enabled in `rules`, `overrides` or with `-W`/`-D`. As in Oxlint,
+categories and `recommended` only select built-in rules (a plugin rule's `docs.category` and
+`docs.recommended` are ignored), but `all` includes plugin rules. Inline directives and `--rules` cover them like
+built-in rules.
+
+A plugin is a default export with `rules`. A rule has `meta` and a `create(context)` function that
+returns functions for the mdast nodes to check:
+
+```js
+export default {
+  meta: { name: "eslint-plugin-team" }, // rules are named team/<rule>
+  rules: {
+    "no-todo": {
+      meta: {
+        docs: { description: "Disallow TODO notes" },
+        messages: { todo: "Resolve the {{ word }} before committing" },
+        schema: [{ type: "object", properties: { word: { type: "string" } }, additionalProperties: false }],
+        defaultOptions: [{ word: "TODO" }],
+      },
+      create(context) {
+        const [{ word }] = context.options;
+        return {
+          // A CSS-like selector, as in ESLint: text directly inside a heading or paragraph.
+          ":matches(heading, paragraph) > text"(node) {
+            if (node.value.includes(word)) context.report({ node, messageId: "todo", data: { word } });
+          },
+        };
+      },
+    },
+  },
+};
+```
+
+The package includes TypeScript types for plugins (types only, it has no JavaScript exports):
+`import type { Plugin, Rule } from "agentfile-linter"`, then `const rule: Rule<[Options]> = { ... }`.
+In JavaScript, use `/** @type {import("agentfile-linter").Plugin} */`.
+
+The API is ESLint's (for Markdown, so lines and columns start at 1):
+
+- `context`: `id`, `options` (merged over `meta.defaultOptions`), `settings`, `filename`,
+  `physicalFilename`, `cwd`, `sourceCode` and `report()`.
+- `context.sourceCode`: `text`, `ast`, `lines`, `getText()`, `getLoc()`, `getRange()`,
+  `getParent()`, `getAncestors()`, `getLocFromIndex()`, `getIndexFromLoc()` and
+  `lineStartIndices`.
+- `report()` takes `message` or `messageId` with `data`, and `node` or `loc`.
+- Visitor keys are node types or [esquery](https://github.com/estools/esquery) selectors, with
+  `:exit` for leaving a node. Oxlint's `createOnce` with `before` and `after` hooks works too,
+  so plugins wrapped in `eslintCompatPlugin` from `@oxlint/plugins` run as well.
+- `meta.schema` validates the options of a rule (keywords such as `$ref` or `format` are
+  ignored). As in ESLint, a rule without a schema takes no options.
+
+agentfile-linter adds a few extensions. ESLint and Oxlint ignore the first two, but rules that use
+the others only run in agentfile-linter:
+
+- `report({ help })`: a hint how to fix the problem, printed below it.
+- `meta.timeDependent`: the rule's problems depend on the current time, so directives for it are
+  never reported as unnecessary.
+- `context.project`: cached file system access to the file's project (its nearest Git root).
+- A visitor function, and the `after` hook of `createOnce`, can return a promise, which is awaited.
+- `collectTreeInputs()` and `checkTree()` instead of `create()`: rules that check the linted
+  directories as a whole, such as `agentfile/no-invalid-skill`.
+
+Not supported: fixes and suggestions (`fix` and `suggest` are accepted and ignored), processors,
+custom languages, defaults from schemas, and deprecated context methods such as
+`context.getSourceCode()` (use `context.sourceCode`). Like the built-in rules, plugin rules should be deterministic: their
+results should depend only on the linted files and the config.
 
 ## Rule details
 

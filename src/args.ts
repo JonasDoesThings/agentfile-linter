@@ -1,5 +1,6 @@
 import type { CliRuleFlag } from "./config.ts";
 import { FORMATS, type Format } from "./formatters.ts";
+import { CATEGORIES, CATEGORY_DESCRIPTIONS } from "./types.ts";
 
 export interface CliArgs {
   paths: string[];
@@ -164,9 +165,9 @@ Basic Configuration
 Allowing / Denying Multiple Lints
   Accumulated left to right on top of the config, e.g.
   \`-A all -D no-missing-path\` or \`-W recommended -A agentfile/no-missing-script\`.
-  The categories are:
-    * recommended - all rules in this release (enabled by default)
-    * all         - every rule
+  The categories (of built-in rules) are:
+${CATEGORIES.map((category) => `    * ${category.padEnd(11)} - ${CATEGORY_DESCRIPTIONS[category]}`).join("\n")}
+    * all         - Every rule, including those of plugins
   -A, --allow=NAME        Allow the rule or category (turn it off)
   -W, --warn=NAME         Report the rule or category as a warning
   -D, --deny=NAME         Report the rule or category as an error

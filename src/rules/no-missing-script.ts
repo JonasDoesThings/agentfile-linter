@@ -3,7 +3,7 @@ import { dirname } from "node:path";
 import type { Code, InlineCode } from "mdast";
 
 import { Glob } from "#src/glob.ts";
-import { computeLineStarts, offsetToPosition, visit } from "#src/markdown.ts";
+import { computeLineStarts, offsetToPosition } from "#src/markdown.ts";
 import { checkCommand, RUNNER_IDS } from "#src/runners/index.ts";
 import {
   codeBlockCommandLines,
@@ -13,7 +13,8 @@ import {
   tokenize,
   tokenEndOffset,
 } from "#src/shell.ts";
-import type { LintedFile, Rule } from "#src/types.ts";
+import type { SourceCode } from "#src/source-code.ts";
+import type { Rule } from "#src/types.ts";
 
 export interface NoMissingScriptOptions {
   /** Glob patterns of script / target / task names that are never reported. */
@@ -30,21 +31,21 @@ interface CommandLine {
 /** Map Markdown code lines past any prefixes removed by the parser. */
 function codeSourceOffsets(
   value: string,
-  file: LintedFile,
+  file: SourceCode,
   startLine: number,
   startOffset: number,
   endOffset: number,
 ): number[] {
   return value.split(/\r?\n/).map((line, index) => {
-    const lineStart = index === 0 ? startOffset : (file.lineStarts[startLine - 1 + index] ?? startOffset);
-    const nextLine = file.lineStarts[startLine + index] ?? endOffset;
+    const lineStart = index === 0 ? startOffset : (file.lineStartIndices[startLine - 1 + index] ?? startOffset);
+    const nextLine = file.lineStartIndices[startLine + index] ?? endOffset;
     const raw = file.text.slice(lineStart, Math.min(nextLine, endOffset)).replace(/\r?\n$/, "");
     const prefix = raw.endsWith(line) ? raw.length - line.length : Math.max(0, raw.indexOf(line));
     return lineStart + prefix;
   });
 }
 
-function commandLines(node: InlineCode | Code, file: LintedFile): CommandLine[] {
+function commandLines(node: InlineCode | Code, file: SourceCode): CommandLine[] {
   const startLine = node.position?.start.line ?? 1;
   const startOffset = node.position?.start.offset ?? 0;
   const endOffset = node.position?.end.offset ?? file.text.length;
@@ -67,7 +68,7 @@ function commandLines(node: InlineCode | Code, file: LintedFile): CommandLine[] 
     node.value,
     file,
     startLine + (fenced ? 1 : 0),
-    fenced ? (file.lineStarts[startLine] ?? startOffset) : startOffset,
+    fenced ? (file.lineStartIndices[startLine] ?? startOffset) : startOffset,
     endOffset,
   );
   return codeBlockCommandLines(node.value, node.lang).map(({ text, parts }) => ({
@@ -79,36 +80,42 @@ function commandLines(node: InlineCode | Code, file: LintedFile): CommandLine[] 
   }));
 }
 
-export const noMissingScript: Rule<NoMissingScriptOptions> = {
+export const noMissingScript: Rule<[NoMissingScriptOptions]> = {
   meta: {
-    name: "agentfile/no-missing-script",
-    description:
-      "Documented scripts and tasks (npm/pnpm/yarn/bun/deno, make, just, task, poetry/uv/pdm/hatch/tox/nox, maven, gradle, composer, cargo) must exist",
-    categories: ["recommended"],
-    defaultSeverity: "error",
-    schema: {
-      type: "object",
-      properties: {
-        ignore: {
-          type: "array",
-          items: { type: "string" },
-          description: "Glob patterns of script, target or task names to skip.",
-        },
-        ignoreRunners: {
-          type: "array",
-          items: { type: "string", enum: RUNNER_IDS },
-          description: "Task runners whose commands are not checked.",
-        },
-      },
+    docs: {
+      description:
+        "Documented scripts and tasks (npm/pnpm/yarn/bun/deno, make, just, task, poetry/uv/pdm/hatch/tox/nox, maven, gradle, composer, cargo) must exist",
+      recommended: true,
+      category: "correctness",
     },
+    schema: [
+      {
+        type: "object",
+        properties: {
+          ignore: {
+            type: "array",
+            items: { type: "string" },
+            description: "Glob patterns of script, target or task names to skip.",
+          },
+          ignoreRunners: {
+            type: "array",
+            items: { type: "string", enum: RUNNER_IDS },
+            description: "Task runners whose commands are not checked.",
+          },
+        },
+        additionalProperties: false,
+      },
+    ],
+    defaultOptions: [{ ignore: [], ignoreRunners: [] }],
   },
-  defaultOptions: { ignore: [], ignoreRunners: [] },
-  check({ file, project, options, report }) {
-    const fileDir = dirname(file.path);
+  create(context) {
+    const { sourceCode, project, report } = context;
+    const [options] = context.options;
+    const fileDir = dirname(context.filename);
     const ignoreGlobs = options.ignore.map((p) => new Glob(p));
     const ignoredRunners = new Set(options.ignoreRunners);
 
-    visit(file.ast, ["inlineCode", "code"], (node) => {
+    const checkCode = (node: InlineCode | Code) => {
       if (node.type === "code" && !isShellLang(node.lang)) return;
       // `cd` persists across the lines of one code block, like in a shell session.
       let cwd: string | null = fileDir;
@@ -117,7 +124,7 @@ export const noMissingScript: Rule<NoMissingScriptOptions> = {
       const pipelineTailSharesCwd =
         node.type === "code" && /^(?:zsh|ps1|powershell|pwsh|nu|nushell)$/i.test(node.lang ?? "");
       let followsPipe = false;
-      for (const line of commandLines(node, file)) {
+      for (const line of commandLines(node, sourceCode)) {
         for (const segment of splitSegments(line.text, subshellCwds.length)) {
           const isolatedByPipe = segment.pipeToNext || (followsPipe && !pipelineTailSharesCwd);
           followsPipe = segment.pipeToNext ?? false;
@@ -160,12 +167,12 @@ export const noMissingScript: Rule<NoMissingScriptOptions> = {
             report({
               message: problem.message,
               help: problem.help,
-              start: offsetToPosition(file.lineStarts, start),
-              end: offsetToPosition(file.lineStarts, end),
+              loc: { start: sourceCode.getLocFromIndex(start), end: sourceCode.getLocFromIndex(end) },
             });
           }
         }
       }
-    });
+    };
+    return { inlineCode: checkCode, code: checkCode };
   },
 };

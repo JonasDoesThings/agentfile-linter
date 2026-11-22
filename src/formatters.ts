@@ -32,7 +32,8 @@ function pointsIntoFile(d: Diagnostic): boolean {
 /** `agentfile/no-missing-path` -> `agentfile(no-missing-path)` (oxlint style). */
 function ruleCode(ruleId: string | null): string {
   if (!ruleId) return "agentfile-linter";
-  const slash = ruleId.indexOf("/");
+  // The plugin name can contain a slash (`@scope/plugin`), the rule name can't.
+  const slash = ruleId.lastIndexOf("/");
   return slash === -1 ? ruleId : `${ruleId.slice(0, slash)}(${ruleId.slice(slash + 1)})`;
 }
 

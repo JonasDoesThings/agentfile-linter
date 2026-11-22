@@ -126,7 +126,7 @@ describe("agentfile/no-invalid-skill: layout", () => {
     expect(await summary(root)).toEqual([
       ".agents/skills/foo/SKILL.md:2 Skill name `Foo` must contain only lowercase letters, digits and hyphens",
     ]);
-    expect(collectFiles(options)).toEqual([join(root, ".agents/skills/foo/SKILL.md")]);
+    expect(await collectFiles(options)).toEqual([join(root, ".agents/skills/foo/SKILL.md")]);
   });
 
   test("a problem that only one path of a shared skill has stays at that path", async () => {
@@ -546,7 +546,7 @@ describe("agentfile/no-invalid-skill: configuration and output", () => {
     expect(await lint({ cwd: root, paths })).toMatchObject(skipped);
     const ruleFlags = [{ severity: "off" as const, target: RULE }];
     expect(await lint({ cwd: root, paths, ruleFlags, config: false })).toMatchObject(skipped);
-    expect(collectFiles({ cwd: root, paths })).toEqual([]);
+    expect(await collectFiles({ cwd: root, paths })).toEqual([]);
   });
 
   test("tree rules count as enabled only when they check something", async () => {

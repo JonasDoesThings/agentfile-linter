@@ -32,6 +32,8 @@ async function build(target?: (typeof TARGETS)[number]) {
     "--compile",
     "--no-compile-autoload-bunfig",
     "--no-compile-autoload-dotenv",
+    // Lets `jsPlugins` import packages (and plugins their dependencies) from `node_modules`.
+    "--compile-autoload-package-json",
     "--minify",
     "--bytecode",
     "--outfile",

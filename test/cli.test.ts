@@ -118,13 +118,47 @@ describe("cli", () => {
     expect((await cli(root, "--init")).code).toBe(2);
 
     const rules = (await cli(root, "--rules")).stdout;
-    expect(rules).toMatch(/^agentfile\/no-agent-files-drift +recommended +error /m);
-    expect(rules).toMatch(/^agentfile\/keep-agents-file-up-to-date +- +warn /m);
+    expect(rules).toMatch(/^agentfile\/no-agent-files-drift +suspicious +error +AGENTS\.md/m);
+    expect(rules).toMatch(/^agentfile\/keep-agents-file-up-to-date +pedantic +off +Context files/m);
     const printed = JSON.parse((await cli(root, "--print-config", "-A", "no-missing-script")).stdout);
     expect(printed.configFile).toBe(".agentfile-linterrc.json");
     expect(printed.rules["agentfile/no-missing-script"]).toBe("off");
     expect((await cli(root, "-V")).stdout).toBe(`agentfile-linter ${pkg.version}\n`);
     expect((await cli(root, "-h")).stdout).toContain("Usage: agentfile-linter [OPTIONS] [PATH]...");
+  });
+
+  test("--rules lists the rules that load and reports config problems below them", async () => {
+    const plugin = 'export default { meta: { name: "ok" }, rules: { rule: { create: () => ({}) } } };';
+    const root = makeProject({
+      "ok.js": plugin,
+      ".agentfile-linterrc.json": { jsPlugins: ["./ok.js", "./missing.js"], rules: { "missing/rule": "error" } },
+    });
+    const listed = await cli(root, "--rules");
+    expect(listed.code).toBe(0);
+    expect(listed.stdout).toMatch(/^ok\/rule +- +off/m);
+    expect(listed.stdout).toMatch(/^agentfile\/no-missing-path /m);
+    expect(listed.stderr).toMatch(
+      /^\nagentfile-linter: \.agentfile-linterrc\.json: Cannot load plugin "\.\/missing\.js": .*\. Its rules are not listed\.\n$/,
+    );
+
+    const malformed = makeProject({
+      "ok.js": plugin,
+      "name.js": "export default { meta: { name: 42 }, rules: { rule: { create: () => ({}) } } };",
+      "meta.js": 'export default { meta: "x", rules: { rule: { create: () => ({}) } } };',
+      ".agentfile-linterrc.json": { jsPlugins: ["./ok.js", "./name.js", "./meta.js"] },
+    });
+    const isolated = await cli(malformed, "--rules");
+    expect(isolated.code).toBe(0);
+    expect(isolated.stdout).toMatch(/^ok\/rule +- +off/m);
+    expect(isolated.stderr).toContain('Plugin "./name.js" has an invalid `meta.name`: expected a string.');
+    expect(isolated.stderr).toContain('Plugin "./meta.js" has an invalid `meta`: expected an object');
+
+    const typo = makeProject({ ".agentfile-linterrc.json": { rules: { "no-missing-paht": "error" } } });
+    const fixed = await cli(typo, "--rules");
+    expect(fixed.code).toBe(0);
+    expect(fixed.stdout).toMatch(/^agentfile\/no-missing-path /m);
+    expect(fixed.stderr).toContain('unknown rule "no-missing-paht". Did you mean "agentfile/no-missing-path"?');
+    expect((await cli(typo, "--rules", "-c", "nope.json")).stderr).toContain("Config file not found: nope.json");
   });
 
   test("--init preserves an existing JSONC config", async () => {

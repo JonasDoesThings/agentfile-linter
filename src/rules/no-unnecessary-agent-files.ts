@@ -6,7 +6,7 @@ import { toPosix } from "#src/gitignore.ts";
 import { parseMarkdown, visit } from "#src/markdown.ts";
 import { type Project, tryRealpath } from "#src/project.ts";
 import { firstLineRange } from "#src/text.ts";
-import type { ReportDescriptor, Rule } from "#src/types.ts";
+import type { Rule, SourceLocation } from "#src/types.ts";
 
 import { normalizeContent, pointerImports } from "./no-agent-files-drift.ts";
 import { findImports } from "./no-missing-path.ts";
@@ -211,14 +211,13 @@ function subtreeIsClear(project: Project, dir: string, candidates: ReadonlyMap<s
 
 export const noUnnecessaryAgentFiles: Rule = {
   meta: {
-    name: "agentfile/no-unnecessary-agent-files",
-    description: "CLAUDE.md must not merely mirror AGENTS.md, which Claude Code reads itself",
-    categories: [],
-    defaultSeverity: "warn",
+    docs: {
+      description: "CLAUDE.md must not merely mirror AGENTS.md, which Claude Code reads itself",
+      category: "pedantic",
+    },
   },
-  defaultOptions: {},
   async checkTree(ctx) {
-    const candidates = new Map<string, Problem & Pick<ReportDescriptor, "start" | "end">>();
+    const candidates = new Map<string, Problem & { loc: SourceLocation }>();
     const roots = new Set<string>();
     for (const path of ctx.contextFiles) {
       // Every context file is checked for being an unnecessary CLAUDE.md, even if it is not one.
@@ -234,7 +233,7 @@ export const noUnnecessaryAgentFiles: Rule = {
       const problem = redundancy(project, ctx.cwd, dir, text);
       const range = firstLineRange(text);
       if (!problem || ctx.isSuppressed(path, range.start)) continue;
-      candidates.set(dir, { ...problem, ...range });
+      candidates.set(dir, { ...problem, loc: range });
       roots.add(project.root);
     }
     if (candidates.size === 0) return;
@@ -253,7 +252,7 @@ export const noUnnecessaryAgentFiles: Rule = {
     const referenced = referencedCandidates(candidates, roots, ctx.contextFiles, (dir) => ctx.projectFor(dir));
     for (const dir of referenced) candidates.delete(dir);
 
-    const groups = new Map<string, { dir: string; descriptor: Problem & Pick<ReportDescriptor, "start" | "end"> }[]>();
+    const groups = new Map<string, { dir: string; descriptor: Problem & { loc: SourceLocation } }[]>();
     for (const [dir, descriptor] of candidates) {
       const root = removalRoot(ctx.projectFor(dir), dir, candidates);
       if (root === null) continue;

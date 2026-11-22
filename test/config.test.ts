@@ -5,11 +5,12 @@ import { join } from "node:path";
 import { buildConfigSchema } from "#src/config-schema.ts";
 import { ConfigError, parseConfig, RuleResolver } from "#src/config.ts";
 import { setup } from "#src/linter.ts";
+import { BUILTIN_RULES } from "#src/rules/index.ts";
 
-import { makeProject, messages, run } from "./helpers.ts";
+import { makeProject, messages, rejection, run } from "./helpers.ts";
 
 const enabled = (resolver: RuleResolver, file = "/x/AGENTS.md"): Record<string, string> =>
-  Object.fromEntries(resolver.forFile(file).map((r) => [r.rule.meta.name, r.severity]));
+  Object.fromEntries(resolver.forFile(file).map((r) => [r.id, r.severity]));
 
 const ALL_ERROR: Record<string, string> = {
   "agentfile/no-missing-path": "error",
@@ -61,6 +62,34 @@ describe("rule resolution", () => {
     expect(Object.values(enabled(categories))).toEqual(["warn", "warn", "warn", "warn", "warn", "warn"]);
   });
 
+  test("categories select built-in rules by `docs.category`", () => {
+    const config = parseConfig({ categories: { correctness: "warn", pedantic: "error" } }, null, "/x");
+    expect(enabled(new RuleResolver(config))).toEqual({
+      "agentfile/no-missing-path": "warn",
+      "agentfile/no-missing-script": "warn",
+      "agentfile/no-broken-reference": "warn",
+      "agentfile/no-agent-files-drift": "error",
+      "agentfile/no-invalid-skill": "warn",
+      "agentfile/no-misnamed-agent-file": "warn",
+      "agentfile/no-unnecessary-agent-files": "error",
+      "agentfile/keep-agents-file-up-to-date": "error",
+      "agentfile/limit-file-size": "error",
+    });
+    const flags = new RuleResolver(parseConfig({}, null, "/x"), [
+      { severity: "off", target: "all" },
+      { severity: "error", target: "suspicious" },
+      // Valid, but without rules yet.
+      { severity: "error", target: "style" },
+      { severity: "error", target: "perf" },
+    ]);
+    expect(enabled(flags)).toEqual({ "agentfile/no-agent-files-drift": "error" });
+  });
+
+  test("every built-in rule has a category", () => {
+    const uncategorized = [...BUILTIN_RULES.rules.keys()].filter((name) => !BUILTIN_RULES.categoryOf(name));
+    expect(uncategorized).toEqual([]);
+  });
+
   test("overrides apply to matching files", () => {
     const config = parseConfig(
       {
@@ -75,16 +104,14 @@ describe("rule resolution", () => {
     const resolver = new RuleResolver(config);
     expect(enabled(resolver, "/x/packages/legacy/AGENTS.md")["agentfile/no-missing-path"]).toBeUndefined();
     expect(enabled(resolver, "/x/packages/other/AGENTS.md")["agentfile/no-missing-path"]).toBe("error");
-    const gemini = resolver.forFile("/x/sub/GEMINI.md").find((r) => r.rule.meta.name === "agentfile/no-missing-script");
-    expect(gemini).toMatchObject({ severity: "warn", options: { ignore: ["x"] } });
+    const gemini = resolver.forFile("/x/sub/GEMINI.md").find((r) => r.id === "agentfile/no-missing-script");
+    expect(gemini).toMatchObject({ severity: "warn", options: [{ ignore: ["x"] }] });
   });
 
   test("rule options are merged over defaults", () => {
     const config = parseConfig({ rules: { "no-missing-path": ["error", { checkImports: false }] } }, null, "/x");
-    const rule = new RuleResolver(config)
-      .forFile("/x/AGENTS.md")
-      .find((r) => r.rule.meta.name === "agentfile/no-missing-path");
-    expect(rule?.options).toEqual({ ignore: [], allowSuffixMatch: true, checkImports: false });
+    const rule = new RuleResolver(config).forFile("/x/AGENTS.md").find((r) => r.id === "agentfile/no-missing-path");
+    expect(rule?.options).toEqual([{ ignore: [], allowSuffixMatch: true, checkImports: false }]);
   });
 
   test("matching overrides inherit options and replace only explicit keys", () => {
@@ -101,20 +128,18 @@ describe("rule resolution", () => {
       "/x",
     );
     const resolver = new RuleResolver(config);
-    const ruleFor = (path: string) => resolver.forFile(path).find((r) => r.rule.meta.name === name);
+    const ruleFor = (path: string) => resolver.forFile(path).find((r) => r.id === name);
     expect(ruleFor("/x/docs/strict/AGENTS.md")).toMatchObject({
       severity: "error",
-      options: { checkImports: false, allowSuffixMatch: false, ignore: [] },
+      options: [{ checkImports: false, allowSuffixMatch: false, ignore: [] }],
     });
     expect(ruleFor("/x/docs/AGENTS.md")).toMatchObject({
       severity: "warn",
-      options: { checkImports: false, allowSuffixMatch: false, ignore: ["generated/**"] },
+      options: [{ checkImports: false, allowSuffixMatch: false, ignore: ["generated/**"] }],
     });
-    expect(ruleFor("/x/AGENTS.md")?.options).toEqual({
-      checkImports: false,
-      allowSuffixMatch: true,
-      ignore: ["generated/**"],
-    });
+    expect(ruleFor("/x/AGENTS.md")?.options).toEqual([
+      { checkImports: false, allowSuffixMatch: true, ignore: ["generated/**"] },
+    ]);
   });
 });
 
@@ -149,7 +174,7 @@ describe("config files", () => {
       ".agentfile-linterrc.json": '{\n  // comment\n  "rules": { "no-missing-path": "off", },\n}\n',
       "packages/a/AGENTS.md": "`missing.ts`\n",
     });
-    const { config } = setup({ cwd: join(root, "packages/a") });
+    const { config } = await setup({ cwd: join(root, "packages/a") });
     expect(config.path).toBe(join(root, ".agentfile-linterrc.json"));
     expect(await run(join(root, "packages/a"))).toEqual([]);
   });
@@ -180,7 +205,7 @@ describe("config files", () => {
 
   test("messages are stable for invalid JSON", async () => {
     const root = makeProject({ ".agentfile-linterrc.json": "{ nope" });
-    expect(() => setup({ cwd: root })).toThrow(/Failed to parse/);
+    expect(await rejection(setup({ cwd: root }))).toMatch(/Failed to parse/);
     expect(messages(await run(root, { config: false }))).toEqual([]);
   });
 });

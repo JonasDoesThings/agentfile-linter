@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { ConfigError } from "#src/config.ts";
 import { collectFiles, lint } from "#src/linter.ts";
 
-import { makeProject, messages, run } from "./helpers.ts";
+import { makeProject, messages, rejection, run } from "./helpers.ts";
 
 describe("file discovery", () => {
   test("finds context files in nested directories, respecting .gitignore", async () => {
@@ -38,23 +38,25 @@ describe("file discovery", () => {
       "CLAUDE.md": "",
       "GEMINI.md": "",
     });
-    expect(collectFiles({ cwd: root, config: false })).toEqual([join(root, "AGENTS.md")]);
+    expect(await collectFiles({ cwd: root, config: false })).toEqual([join(root, "AGENTS.md")]);
   });
 
   test.each([
     ["unset", false],
     ["false", false],
     ["true", true],
-  ])("Git ignore case follows core.ignoreCase=%s", (setting, ignored) => {
+  ])("Git ignore case follows core.ignoreCase=%s", async (setting, ignored) => {
     const root = makeProject({
       ".gitignore": "vendor/\n",
       "Vendor/AGENTS.md": "",
       ...(setting === "unset" ? {} : { ".git/config": `[core]\n\tignoreCase = ${setting}\n` }),
     });
-    expect(collectFiles({ cwd: root, config: false })).toEqual(ignored ? [] : [join(root, "Vendor", "AGENTS.md")]);
+    expect(await collectFiles({ cwd: root, config: false })).toEqual(
+      ignored ? [] : [join(root, "Vendor", "AGENTS.md")],
+    );
   });
 
-  test("reads the common Git config in a linked worktree", () => {
+  test("reads the common Git config in a linked worktree", async () => {
     const root = makeProject(
       {
         ".git": "gitdir: .metadata/worktrees/local\n",
@@ -65,7 +67,7 @@ describe("file discovery", () => {
       },
       { git: false },
     );
-    expect(collectFiles({ cwd: root, config: false })).toEqual([]);
+    expect(await collectFiles({ cwd: root, config: false })).toEqual([]);
   });
 
   test("--no-ignore includes git-ignored files (but never node_modules)", async () => {
@@ -118,7 +120,7 @@ describe("file discovery", () => {
     );
     const options = { cwd: join(root, "caller"), config: false as const, paths: ["../repo/docs", "../repo"] };
     // An explicitly named subdirectory and the enclosing directory use the same project.
-    expect(collectFiles(options)).toEqual([join(root, "repo", "docs", "AGENTS.md")]);
+    expect(await collectFiles(options)).toEqual([join(root, "repo", "docs", "AGENTS.md")]);
     expect(await lint(options)).toMatchObject({ fileCount: 1, errorCount: 0 });
   });
 
@@ -134,7 +136,9 @@ describe("file discovery", () => {
           "Path `missing.ts` does not exist",
           "Cannot read directory (EACCES)",
         ]);
-        expect(() => collectFiles({ cwd: root, config: false })).toThrow("Cannot read directories: private (EACCES)");
+        expect(await rejection(collectFiles({ cwd: root, config: false }))).toBe(
+          "Cannot read directories: private (EACCES)",
+        );
       } finally {
         chmodSync(dir, 0o700);
       }

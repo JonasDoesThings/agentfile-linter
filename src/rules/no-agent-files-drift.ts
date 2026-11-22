@@ -1,7 +1,7 @@
 import { basename, dirname, join } from "node:path";
 
 import type { Project } from "#src/project.ts";
-import type { Rule } from "#src/types.ts";
+import type { Rule, RuleContext } from "#src/types.ts";
 
 export interface NoAgentFilesDriftOptions {
   /** File names (in one directory) that must stay in sync, in order of precedence. */
@@ -72,72 +72,85 @@ function resolveEffective(
   return { unresolved: true };
 }
 
-export const noAgentFilesDrift: Rule<NoAgentFilesDriftOptions> = {
+export const noAgentFilesDrift: Rule<[NoAgentFilesDriftOptions]> = {
   meta: {
-    name: "agentfile/no-agent-files-drift",
-    description: "AGENTS.md, CLAUDE.md, GEMINI.md, ... in the same directory must be identical or symlinked",
-    categories: ["recommended"],
-    defaultSeverity: "error",
-    schema: {
-      type: "object",
-      properties: {
-        files: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "File names that must stay in sync, in order of precedence (the first existing one is canonical).",
-        },
-        allowImports: {
-          type: "boolean",
-          description: "Treat a file that only contains `@AGENTS.md`-style imports of a sibling as in sync.",
-        },
-      },
+    docs: {
+      description: "AGENTS.md, CLAUDE.md, GEMINI.md, ... in the same directory must be identical or symlinked",
+      recommended: true,
+      category: "suspicious",
     },
+    schema: [
+      {
+        type: "object",
+        properties: {
+          files: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              "File names that must stay in sync, in order of precedence (the first existing one is canonical).",
+          },
+          allowImports: {
+            type: "boolean",
+            description: "Treat a file that only contains `@AGENTS.md`-style imports of a sibling as in sync.",
+          },
+        },
+        additionalProperties: false,
+      },
+    ],
+    defaultOptions: [{ files: ["AGENTS.md", "AGENT.md", "CLAUDE.md", "GEMINI.md"], allowImports: true }],
   },
-  defaultOptions: { files: ["AGENTS.md", "AGENT.md", "CLAUDE.md", "GEMINI.md"], allowImports: true },
-  check({ file, project, options, report }) {
-    const name = basename(file.path);
-    if (!options.files.includes(name)) return;
-    const dir = dirname(file.path);
-    const members = options.files.filter((f) => f === name || project.isFile(join(dir, f)));
-    if (members.length < 2) return;
-
-    const overrides = new Map([[file.path, file.text]]);
-    const effective = (member: string) => resolveEffective(project, join(dir, member), options.allowImports, overrides);
-
-    const self = effective(name);
-    if ("cycle" in self) {
-      report({
-        message: `\`${name}\` is part of an import cycle; no file contains the actual instructions`,
-        start: { line: 1, column: 1 },
-      });
-      return;
-    }
-    if ("unresolved" in self) return; // broken import: reported by agentfile/no-missing-path
-
-    let canonical: { name: string; value: Effective } | undefined;
-    for (const member of members) {
-      const value = member === name ? self : effective(member);
-      if ("content" in value) {
-        canonical = { name: member, value };
-        break;
-      }
-    }
-    if (!canonical || canonical.name === name) return;
-    if (self.content === canonical.value.content) return;
-
-    const isPointer = self.source !== file.path;
-    const line = isPointer ? 1 : firstDifferentLine(normalizeContent(file.text), canonical.value.content);
-    const lineText = file.text.split(/\r?\n/)[line - 1] ?? "";
-    const fixes = [`symlink it (\`ln -sf ${canonical.name} ${name}\`)`, "copy the content over"];
-    if (options.allowImports) fixes.push(`replace its content with \`@${canonical.name}\``);
-    report({
-      message: isPointer
-        ? `\`${name}\` imports \`${basename(self.source)}\`, whose content differs from \`${canonical.name}\``
-        : `\`${name}\` has drifted from \`${canonical.name}\` (first difference at line ${line})`,
-      help: `Keep agent files in sync: ${fixes.slice(0, -1).join(", ")} or ${fixes.at(-1)}.`,
-      start: { line, column: 1 },
-      end: { line, column: Math.max(1, lineText.length + 1) },
-    });
+  create(context) {
+    return { root: () => check(context) };
   },
 };
+
+function check({
+  filename: path,
+  sourceCode: { text },
+  options: [options],
+  project,
+  report,
+}: RuleContext<[NoAgentFilesDriftOptions]>) {
+  const name = basename(path);
+  if (!options.files.includes(name)) return;
+  const dir = dirname(path);
+  const members = options.files.filter((f) => f === name || project.isFile(join(dir, f)));
+  if (members.length < 2) return;
+
+  const overrides = new Map([[path, text]]);
+  const effective = (member: string) => resolveEffective(project, join(dir, member), options.allowImports, overrides);
+
+  const self = effective(name);
+  if ("cycle" in self) {
+    report({
+      message: `\`${name}\` is part of an import cycle; no file contains the actual instructions`,
+      loc: { line: 1, column: 1 },
+    });
+    return;
+  }
+  if ("unresolved" in self) return; // broken import: reported by agentfile/no-missing-path
+
+  let canonical: { name: string; value: Effective } | undefined;
+  for (const member of members) {
+    const value = member === name ? self : effective(member);
+    if ("content" in value) {
+      canonical = { name: member, value };
+      break;
+    }
+  }
+  if (!canonical || canonical.name === name) return;
+  if (self.content === canonical.value.content) return;
+
+  const isPointer = self.source !== path;
+  const line = isPointer ? 1 : firstDifferentLine(normalizeContent(text), canonical.value.content);
+  const lineText = text.split(/\r?\n/)[line - 1] ?? "";
+  const fixes = [`symlink it (\`ln -sf ${canonical.name} ${name}\`)`, "copy the content over"];
+  if (options.allowImports) fixes.push(`replace its content with \`@${canonical.name}\``);
+  report({
+    message: isPointer
+      ? `\`${name}\` imports \`${basename(self.source)}\`, whose content differs from \`${canonical.name}\``
+      : `\`${name}\` has drifted from \`${canonical.name}\` (first difference at line ${line})`,
+    help: `Keep agent files in sync: ${fixes.slice(0, -1).join(", ")} or ${fixes.at(-1)}.`,
+    loc: { start: { line, column: 1 }, end: { line, column: Math.max(1, lineText.length + 1) } },
+  });
+}

@@ -64,7 +64,7 @@ function isMeantAs(project: Project, path: string, expected: string, entries: re
 }
 
 /** The name a file should have, when it is a misnamed context file. */
-function misnamedAs(ctx: Pick<TreeDiscoveryContext<unknown>, "projectFor" | "isContextFile">, path: string) {
+function misnamedAs(ctx: Pick<TreeDiscoveryContext<unknown[]>, "projectFor" | "isContextFile">, path: string) {
   const expected = intendedName(basename(path));
   // Configured `files` patterns make the name a context file.
   if (!expected || ctx.isContextFile(path)) return undefined;
@@ -80,12 +80,12 @@ function misnamedAs(ctx: Pick<TreeDiscoveryContext<unknown>, "projectFor" | "isC
 
 export const noMisnamedAgentFile: Rule = {
   meta: {
-    name: "agentfile/no-misnamed-agent-file",
-    description: "AGENTS.md, CLAUDE.md, ... must be named in the exact case agents look for",
-    categories: ["recommended"],
-    defaultSeverity: "error",
+    docs: {
+      description: "AGENTS.md, CLAUDE.md, ... must be named in the exact case agents look for",
+      recommended: true,
+      category: "correctness",
+    },
   },
-  defaultOptions: {},
   collectTreeInputs(ctx) {
     // Files named on the command line are linted as context files; `checkTree` checks their names.
     const explicitFiles = new Set(ctx.explicitFiles);
@@ -114,7 +114,6 @@ export const noMisnamedAgentFile: Rule = {
           `Agents look for \`${expected}\`; other spellings are not found on case-sensitive file systems. ` +
           "If Git tracks the file, rename it with `git mv`: on case-insensitive file systems (the macOS and " +
           "Windows default), Git doesn't notice a plain rename that only changes case.",
-        start: { line: 1, column: 1 },
       });
     }
   },

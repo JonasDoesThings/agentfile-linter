@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 
-import { RULES } from "#src/rules/index.ts";
+import { BUILTIN_RULES, type RuleRegistry } from "#src/rules/index.ts";
 
 import {
   type CliRuleFlag,
@@ -11,13 +11,16 @@ import {
   emptyConfig,
   findConfigFile,
   loadConfigFile,
+  loadRuleRegistry,
   matchesFilePattern,
   RuleResolver,
 } from "./config.ts";
 import { discoverFiles } from "./discovery.ts";
 import { PatternIgnore } from "./gitignore.ts";
-import { computeLineStarts, parseMarkdown } from "./markdown.ts";
+import { parseMarkdown } from "./markdown.ts";
 import { ALWAYS_SKIPPED_DIRS, type Project, ProjectRegistry, tryRealpath } from "./project.ts";
+import { crashDiagnostic, runRules, toDiagnostic } from "./rule-runner.ts";
+import { SourceCode } from "./source-code.ts";
 import {
   applySuppressions,
   collectDirectives,
@@ -26,16 +29,7 @@ import {
   unknownRuleDiagnostics,
   unnecessarySuppressionDiagnostics,
 } from "./suppressions.ts";
-import type {
-  AnyRule,
-  Diagnostic,
-  FileResult,
-  LintedFile,
-  LintResult,
-  Position,
-  TreeDiscoveryContext,
-  TreeInput,
-} from "./types.ts";
+import type { Diagnostic, FileResult, LintResult, Position, TreeDiscoveryContext, TreeInput } from "./types.ts";
 
 export const DEFAULT_IGNORE_FILE = ".agentfile-linterignore";
 
@@ -62,21 +56,38 @@ export interface LintSetup {
   resolver: RuleResolver;
 }
 
-/** Loads the configuration and validates CLI rule flags. Throws {@link ConfigError}. */
-export function setup(options: LintOptions = {}): LintSetup {
+/** Loads the configuration and its plugins, and validates CLI rule flags. Throws {@link ConfigError}. */
+export async function setup(options: LintOptions = {}): Promise<LintSetup> {
   const cwd = resolve(options.cwd ?? process.cwd());
-  let config: Config;
-  if (options.config === false) {
-    config = emptyConfig(cwd);
-  } else if (options.config) {
-    const path = resolve(cwd, options.config);
-    if (!existsSync(path)) throw new ConfigError(`Config file not found: ${options.config}`);
-    config = loadConfigFile(path);
-  } else {
-    const found = findConfigFile(cwd);
-    config = found ? loadConfigFile(found) : emptyConfig(cwd);
-  }
+  const path = configPath(options, cwd);
+  const config = path ? await loadConfigFile(path) : emptyConfig(cwd);
   return { cwd, config, resolver: new RuleResolver(config, options.ruleFlags) };
+}
+
+/** The config file of a run, or null for none. Throws {@link ConfigError} when `options.config` doesn't exist. */
+function configPath(options: LintOptions, cwd: string): string | null {
+  if (options.config === false) return null;
+  if (!options.config) return findConfigFile(cwd);
+  const path = resolve(cwd, options.config);
+  if (!existsSync(path)) throw new ConfigError(`Config file not found: ${options.config}`);
+  return path;
+}
+
+/**
+ * The rules of a run, for `--rules`: the built-in rules and those of the config's plugins that
+ * load. Problems with the config, such as plugins that fail to load, are returned instead of thrown.
+ */
+export async function availableRules(
+  options: LintOptions = {},
+): Promise<{ registry: RuleRegistry; problems: string[] }> {
+  let path: string | null;
+  try {
+    path = configPath(options, resolve(options.cwd ?? process.cwd()));
+  } catch (error) {
+    if (!(error instanceof ConfigError)) throw error;
+    return { registry: BUILTIN_RULES, problems: [error.message] };
+  }
+  return loadRuleRegistry(path);
 }
 
 function readIgnoreFile(path: string): string[] {
@@ -95,24 +106,33 @@ function fileDiagnostic(filePath: string, message: string, severity: Diagnostic[
 type DirectiveCache = Map<string, Directive[]>;
 
 /** Directives of a file the per-file pass didn't parse. Only files that mention `agentfile-linter-` are parsed. */
-function treeFileDirectives(path: string, realPath: string, registry: ProjectRegistry, cache: DirectiveCache) {
+function treeFileDirectives(
+  path: string,
+  realPath: string,
+  projects: ProjectRegistry,
+  rules: RuleRegistry,
+  cache: DirectiveCache,
+) {
   let directives = cache.get(realPath);
   if (!directives) {
-    const project = registry.forDirectory(dirname(path));
+    const project = projects.forDirectory(dirname(path));
     const text = project.isFile(path) ? project.readText(path) : null;
     directives =
-      text === null || !text.includes("agentfile-linter-") ? [] : collectDirectives({ text, ast: parseMarkdown(text) });
+      text === null || !text.includes("agentfile-linter-")
+        ? []
+        : collectDirectives({ text, ast: parseMarkdown(text) }, rules);
     cache.set(realPath, directives);
   }
   return directives;
 }
 
-/** Runs the given rules over one file. */
-export async function lintFile(
+/** Runs the per-file rules (`create` and `createOnce`) over one file. */
+async function lintFile(
   path: string,
   project: Project,
   rules: EnabledRule[],
-  directiveCache?: DirectiveCache,
+  { cwd, config }: LintSetup,
+  directiveCache: DirectiveCache,
 ): Promise<Diagnostic[]> {
   let text: string;
   let realPath: string;
@@ -123,39 +143,15 @@ export async function lintFile(
     const reason = project.isSymlink(path) ? "broken symbolic link" : (error as NodeJS.ErrnoException).code;
     return [fileDiagnostic(path, `Cannot read file (${reason ?? "unknown error"})`)];
   }
-  const file: LintedFile = { path, realPath, text, ast: parseMarkdown(text), lineStarts: computeLineStarts(text) };
-  const directives = collectDirectives(file);
-  directiveCache?.set(realPath, directives);
-  const diagnostics: Diagnostic[] = [];
-  // Rules are independent; diagnostics are sorted below, so completion order doesn't matter.
-  const runRule = async ({ rule, severity, options }: EnabledRule) => {
-    if (!rule.check) return;
-    try {
-      await rule.check({
-        file,
-        project,
-        options,
-        report(descriptor) {
-          diagnostics.push({
-            ruleId: rule.meta.name,
-            severity,
-            message: descriptor.message,
-            help: descriptor.help,
-            filePath: path,
-            start: descriptor.start,
-            end: descriptor.end ?? descriptor.start,
-          });
-        },
-      });
-    } catch (error) {
-      diagnostics.push({
-        ...fileDiagnostic(path, `Rule crashed: ${(error as Error).stack ?? String(error)}`),
-        ruleId: rule.meta.name,
-      });
-    }
-  };
-  await Promise.all(rules.map(runRule));
-  const kept = [...applySuppressions(diagnostics, directives), ...unknownRuleDiagnostics(path, directives)];
+  const sourceCode = new SourceCode(text, parseMarkdown(text));
+  const directives = collectDirectives(sourceCode, config.registry);
+  directiveCache.set(realPath, directives);
+  const { settings } = config;
+  const diagnostics = await runRules(rules, { filename: path, cwd, sourceCode, project, settings });
+  const kept = [
+    ...applySuppressions(diagnostics, directives),
+    ...unknownRuleDiagnostics(path, directives, config.registry),
+  ];
   return kept.toSorted((a, b) => a.start.line - b.start.line || a.start.column - b.start.column);
 }
 
@@ -163,12 +159,9 @@ export async function lintFile(
  * Discovers the files `lint` would check, including additional rule inputs.
  * Ignored files are excluded and the returned absolute paths are sorted.
  */
-export function collectFiles(
-  options: LintOptions,
-  prepared: LintSetup = setup(options),
-  registry: ProjectRegistry = new ProjectRegistry(prepared.cwd),
-): string[] {
-  const inputs = collectInputs(options, prepared, registry);
+export async function collectFiles(options: LintOptions, prepared?: LintSetup): Promise<string[]> {
+  prepared ??= await setup(options);
+  const inputs = collectInputs(options, prepared, new ProjectRegistry(prepared.cwd));
   const { files, unreadableDirectories } = inputs;
   if (unreadableDirectories.size) {
     const details = [...unreadableDirectories].map(
@@ -290,26 +283,36 @@ class PathAliases {
 /**
  * What tree rules can check, such as SKILL.md files, by rule, regardless of severity. Computed once.
  * Rules that can't be enabled anywhere are only run with `includeDisabled`, to find the files they claim.
+ * A rule whose `collectTreeInputs` throws (or doesn't return an array) claims nothing and gets a
+ * crash diagnostic instead, if it can be enabled anywhere.
  */
 function collectTreeInputs(
   inputs: DiscoveryInputs,
   registry: ProjectRegistry,
   resolver: RuleResolver,
   includeDisabled: boolean,
-): Map<AnyRule, TreeInput[]> {
-  const treeInputs = new Map<AnyRule, TreeInput[]>();
-  for (const rule of RULES.values()) {
-    if (!rule.collectTreeInputs || !(includeDisabled || resolver.canEnable(rule))) continue;
-    treeInputs.set(rule, rule.collectTreeInputs(treeDiscoveryContext(rule, inputs, registry, resolver)));
+  cwd: string,
+): { found: Map<string, TreeInput[]>; crashes: Map<string, Diagnostic> } {
+  const found = new Map<string, TreeInput[]>();
+  const crashes = new Map<string, Diagnostic>();
+  for (const [id, rule] of resolver.registry.rules) {
+    if (!rule.collectTreeInputs || !(includeDisabled || resolver.canEnable(id))) continue;
+    try {
+      const ruleInputs: unknown = rule.collectTreeInputs(treeDiscoveryContext(id, inputs, registry, resolver));
+      if (!Array.isArray(ruleInputs)) throw new TypeError("`collectTreeInputs` must return an array");
+      found.set(id, ruleInputs as TreeInput[]);
+    } catch (error) {
+      if (resolver.canEnable(id)) crashes.set(id, crashDiagnostic(id, cwd, error));
+    }
   }
-  return treeInputs;
+  return { found, crashes };
 }
 
-const isEnabledAt = (resolver: RuleResolver, rule: AnyRule, { path, root }: TreeInput) =>
-  resolver.forFile(path, root).some((r) => r.rule === rule);
+const isEnabledAt = (resolver: RuleResolver, id: string, { path, root }: TreeInput) =>
+  resolver.forFile(path, root).some((r) => r.id === id);
 
 type DiscoveryInputs = Pick<
-  TreeDiscoveryContext<unknown>,
+  TreeDiscoveryContext<unknown[]>,
   "directories" | "directoryInputs" | "explicitFiles" | "isIgnored" | "isContextFile"
 >;
 
@@ -361,12 +364,18 @@ function collectInputs(options: LintOptions, prepared: LintSetup, registry: Proj
     isContextFile,
   };
   const hasOtherExplicitFiles = discovery.explicitFiles.some((path) => !isContextFile(path));
-  const found = collectTreeInputs(discoveryInputs, registry, prepared.resolver, hasOtherExplicitFiles);
-  const treeInputs = new Map<AnyRule, TreeInput[]>();
-  for (const [rule, ruleInputs] of found) {
+  const { found, crashes: treeCrashes } = collectTreeInputs(
+    discoveryInputs,
+    registry,
+    prepared.resolver,
+    hasOtherExplicitFiles,
+    cwd,
+  );
+  const treeInputs = new Map<string, TreeInput[]>();
+  for (const [id, ruleInputs] of found) {
     treeInputs.set(
-      rule,
-      ruleInputs.filter((input) => isEnabledAt(prepared.resolver, rule, input)),
+      id,
+      ruleInputs.filter((input) => isEnabledAt(prepared.resolver, id, input)),
     );
   }
   const treeFiles = [...treeInputs.values()].flat().map(({ path }) => path);
@@ -376,8 +385,8 @@ function collectInputs(options: LintOptions, prepared: LintSetup, registry: Proj
   if (hasOtherExplicitFiles) {
     // Claimed even where the tree rule is off: turning one rule off must not turn others on.
     const claimedBy = new Map<string, string[]>();
-    for (const [rule, ruleInputs] of found) {
-      for (const { path } of ruleInputs) claimedBy.set(path, [...(claimedBy.get(path) ?? []), rule.meta.name]);
+    for (const [id, ruleInputs] of found) {
+      for (const { path } of ruleInputs) claimedBy.set(path, [...(claimedBy.get(path) ?? []), id]);
     }
     contextFiles = contextFiles.filter((path) => !claimedBy.has(path) || isContextFile(path));
     const checked = new Set(treeFiles);
@@ -394,6 +403,7 @@ function collectInputs(options: LintOptions, prepared: LintSetup, registry: Proj
     files: aliases.selectLinted(contextFiles),
     contextFiles,
     treeInputs,
+    treeCrashes,
     treeFiles,
     aliases,
     uncheckedFiles,
@@ -403,11 +413,11 @@ function collectInputs(options: LintOptions, prepared: LintSetup, registry: Proj
 }
 
 function treeDiscoveryContext(
-  rule: AnyRule,
+  id: string,
   inputs: DiscoveryInputs,
   registry: ProjectRegistry,
   resolver: RuleResolver,
-): TreeDiscoveryContext<Record<string, unknown>> {
+): TreeDiscoveryContext<unknown[]> {
   return {
     directories: inputs.directories,
     directoryInputs: inputs.directoryInputs,
@@ -415,8 +425,8 @@ function treeDiscoveryContext(
     isIgnored: inputs.isIgnored,
     isContextFile: inputs.isContextFile,
     projectFor: (dir) => registry.forDirectory(dir),
-    optionsFor: (path, root) => resolver.optionsFor(rule, path, root),
-    discoveryOptions: resolver.discoveryOptions(rule),
+    optionsFor: (path, root) => resolver.optionsFor(id, path, root),
+    discoveryOptions: resolver.discoveryOptions(id),
   };
 }
 
@@ -431,24 +441,26 @@ async function lintTree(
   cwd: string,
   directives: DirectiveCache,
 ) {
-  const diagnostics: Diagnostic[] = [];
+  // Rules whose `collectTreeInputs` crashed don't run `checkTree`: they report the crash instead.
+  const diagnostics: Diagnostic[] = [...inputs.treeCrashes.values()];
   const checked = new Set<string>();
   const enabledRules = new Set<string>();
   /** The rules that checked each file, by real path. */
   const checkedBy = new Map<string, Set<string>>();
   // Overrides matching the root an input was found in apply to everything reported at its path.
   const rootsByRule = new Map(
-    [...inputs.treeInputs].map(([rule, ruleInputs]) => [
-      rule,
+    [...inputs.treeInputs].map(([id, ruleInputs]) => [
+      id,
       new Map(ruleInputs.flatMap(({ path, root }) => (root ? [[path, root] as const] : []))),
     ]),
   );
-  const settingFor = (rule: AnyRule, path: string) =>
-    resolver.forFile(path, rootsByRule.get(rule)?.get(path)).find((r) => r.rule === rule);
-  const treeRules = [...RULES.values()].filter((rule) => rule.checkTree !== undefined && resolver.canEnable(rule));
+  const settingFor = (ruleId: string, path: string) =>
+    resolver.forFile(path, rootsByRule.get(ruleId)?.get(path)).find((r) => r.id === ruleId);
+  const treeRules = [...resolver.registry.rules].filter(
+    ([id, rule]) => rule.checkTree && resolver.canEnable(id) && !inputs.treeCrashes.has(id),
+  );
   await Promise.all(
-    treeRules.map(async (rule) => {
-      const ruleId = rule.meta.name;
+    treeRules.map(async ([ruleId, rule]) => {
       const markChecked = (path: string) => {
         checked.add(path);
         enabledRules.add(ruleId);
@@ -457,40 +469,35 @@ async function lintTree(
         if (rules) rules.add(ruleId);
         else checkedBy.set(realPath, new Set([ruleId]));
       };
-      const isSuppressed = (path: string, start: Position) =>
-        suppresses(treeFileDirectives(path, inputs.aliases.realPath(path), registry, directives), ruleId, start.line);
+      const isSuppressed = (path: string, start: Position) => {
+        const realPath = inputs.aliases.realPath(path);
+        return suppresses(
+          treeFileDirectives(path, realPath, registry, resolver.registry, directives),
+          ruleId,
+          start.line,
+        );
+      };
       try {
         await rule.checkTree?.({
-          ...treeDiscoveryContext(rule, inputs, registry, resolver),
+          ...treeDiscoveryContext(ruleId, inputs, registry, resolver),
           cwd,
           contextFiles: inputs.contextFiles,
-          treeInputs: inputs.treeInputs.get(rule) ?? [],
-          isEnabled: (path) => settingFor(rule, path) !== undefined,
+          treeInputs: inputs.treeInputs.get(ruleId) ?? [],
+          isEnabled: (path) => settingFor(ruleId, path) !== undefined,
           isSuppressed,
           markChecked(path) {
-            if (settingFor(rule, path)) markChecked(path);
+            if (settingFor(ruleId, path)) markChecked(path);
           },
           report(filePath, descriptor) {
-            const setting = settingFor(rule, filePath);
+            const setting = settingFor(ruleId, filePath);
             if (!setting) return;
             markChecked(filePath);
-            if (isSuppressed(filePath, descriptor.start)) return;
-            diagnostics.push({
-              ruleId,
-              severity: setting.severity,
-              message: descriptor.message,
-              help: descriptor.help,
-              filePath,
-              start: descriptor.start,
-              end: descriptor.end ?? descriptor.start,
-            });
+            const diagnostic = toDiagnostic(setting, filePath, descriptor, { line: 1, column: 1 });
+            if (!isSuppressed(filePath, diagnostic.start)) diagnostics.push(diagnostic);
           },
         });
       } catch (error) {
-        diagnostics.push({
-          ...fileDiagnostic(cwd, `Rule crashed: ${(error as Error).stack ?? String(error)}`),
-          ruleId,
-        });
+        diagnostics.push(crashDiagnostic(ruleId, cwd, error));
       }
     }),
   );
@@ -539,7 +546,7 @@ function mergeDiagnostics(
 /** Lints context files according to `options`. Throws {@link ConfigError} for invalid configuration. */
 export async function lint(options: LintOptions = {}, prepared?: LintSetup): Promise<LintResult> {
   const startedAt = performance.now();
-  const ready = prepared ?? setup(options);
+  const ready = prepared ?? (await setup(options));
   const registry = new ProjectRegistry(ready.cwd);
   const inputs = collectInputs(options, ready, registry);
   const { files: paths, ignoredFiles, uncheckedFiles, unreadableDirectories } = inputs;
@@ -554,13 +561,13 @@ export async function lint(options: LintOptions = {}, prepared?: LintSetup): Pro
   const [linted, tree] = await Promise.all([
     Promise.all(
       paths.map(async (path): Promise<FileResult> => {
-        const rules = resolver.forFile(path);
-        const checking = rules.filter((r) => r.rule.check !== undefined).map((r) => r.rule.meta.name);
+        const rules = resolver.forFile(path).filter(({ rule }) => rule.create || rule.createOnce);
+        const checking = rules.map((r) => r.id);
         fileRules.set(path, checking);
         // Tree rules count once they check something (see `tree.enabledRules`).
         for (const name of checking) enabledRules.add(name);
         const project = registry.forDirectory(dirname(path));
-        return { filePath: path, diagnostics: await lintFile(path, project, rules, directives) };
+        return { filePath: path, diagnostics: await lintFile(path, project, rules, ready, directives) };
       }),
     ),
     lintTree(inputs, registry, resolver, ready.cwd, directives),
@@ -570,16 +577,19 @@ export async function lint(options: LintOptions = {}, prepared?: LintSetup): Pro
   // `lintFile` reports unknown rules in the directives of context files; these are the ones in files
   // that only tree rules check, such as SKILL.md.
   const treeOnlyFiles = [...tree.checkedFiles].filter((path) => !lintedFiles.has(realPath(path)));
+  const fileDirectives = (path: string) =>
+    treeFileDirectives(path, realPath(path), registry, resolver.registry, directives);
   const directiveNotes = treeOnlyFiles.flatMap((path) =>
-    unknownRuleDiagnostics(path, treeFileDirectives(path, realPath(path), registry, directives)),
+    unknownRuleDiagnostics(path, fileDirectives(path), resolver.registry),
   );
   // Both passes have recorded which directives suppressed something.
   if (ready.config.reportUnnecessarySuppressions) {
     for (const path of [...paths, ...treeOnlyFiles]) {
       const real = realPath(path);
       const checkedBy = new Set([...(fileRules.get(path) ?? []), ...(tree.checkedBy.get(real) ?? [])]);
-      const fileDirectives = treeFileDirectives(path, real, registry, directives);
-      directiveNotes.push(...unnecessarySuppressionDiagnostics(path, fileDirectives, checkedBy));
+      directiveNotes.push(
+        ...unnecessarySuppressionDiagnostics(path, fileDirectives(path), checkedBy, resolver.registry),
+      );
     }
   }
   const files = mergeDiagnostics(linted, [...tree.diagnostics, ...directiveNotes], tree.checkedFiles, realPath);
@@ -618,7 +628,7 @@ export async function lint(options: LintOptions = {}, prepared?: LintSetup): Pro
       ],
     });
   }
-  if (fileCount === 0) for (const r of resolver.baseRules()) enabledRules.add(r.rule.meta.name);
+  if (fileCount === 0) for (const r of resolver.baseRules()) enabledRules.add(r.id);
 
   let errorCount = 0;
   let warningCount = 0;

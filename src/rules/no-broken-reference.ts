@@ -1,11 +1,11 @@
 import { dirname, extname, join, relative } from "node:path";
 
-import type { Nodes } from "mdast";
+import type { Definition, Image, Link, Nodes } from "mdast";
 
 import { Glob } from "#src/glob.ts";
-import { collectAnchors, locateInNode, visit } from "#src/markdown.ts";
+import { collectAnchors, locateInNode } from "#src/markdown.ts";
 import { countLines, normalizeAnchor, normalizeAnchors } from "#src/project.ts";
-import type { Position, Rule } from "#src/types.ts";
+import type { Rule, SourceLocation } from "#src/types.ts";
 
 export interface NoBrokenReferenceOptions {
   /** Check `#fragment` anchors against headings. */
@@ -43,27 +43,33 @@ function parseLineFragment(fragment: string): LineRange | null {
   return { start, end: match[2] === undefined ? start : Number(match[2]) };
 }
 
-export const noBrokenReference: Rule<NoBrokenReferenceOptions> = {
+export const noBrokenReference: Rule<[NoBrokenReferenceOptions]> = {
   meta: {
-    name: "agentfile/no-broken-reference",
-    description: "Relative Markdown links, images, local #anchors and #L42 line fragments must resolve",
-    categories: ["recommended"],
-    defaultSeverity: "error",
-    schema: {
-      type: "object",
-      properties: {
-        checkAnchors: { type: "boolean", description: "Check `#fragment` anchors against document headings." },
-        checkLines: {
-          type: "boolean",
-          description: "Check `#L42` / `#L42-L50` line fragments against the length of the target file.",
-        },
-        ignore: { type: "array", items: { type: "string" }, description: "Glob patterns of link targets to skip." },
-      },
+    docs: {
+      description: "Relative Markdown links, images, local #anchors and #L42 line fragments must resolve",
+      recommended: true,
+      category: "correctness",
     },
+    schema: [
+      {
+        type: "object",
+        properties: {
+          checkAnchors: { type: "boolean", description: "Check `#fragment` anchors against document headings." },
+          checkLines: {
+            type: "boolean",
+            description: "Check `#L42` / `#L42-L50` line fragments against the length of the target file.",
+          },
+          ignore: { type: "array", items: { type: "string" }, description: "Glob patterns of link targets to skip." },
+        },
+        additionalProperties: false,
+      },
+    ],
+    defaultOptions: [{ checkAnchors: true, checkLines: true, ignore: [] }],
   },
-  defaultOptions: { checkAnchors: true, checkLines: true, ignore: [] },
-  check({ file, project, options, report }) {
-    const fileDir = dirname(file.path);
+  create(context) {
+    const { filename, sourceCode, project, report } = context;
+    const [options] = context.options;
+    const fileDir = dirname(filename);
     const ignoreGlobs = options.ignore.map((p) => new Glob(p));
     let ownAnchors: Set<string> | undefined;
 
@@ -72,23 +78,23 @@ export const noBrokenReference: Rule<NoBrokenReferenceOptions> = {
       range: LineRange,
       lineCount: number | null,
       where: string,
-      loc: () => { start: Position; end?: Position },
+      loc: () => SourceLocation,
     ) => {
       if (lineCount === null) return;
       const label = range.start === range.end ? "Line" : "Line range";
       if (range.start === 0) {
-        report({ message: `${label} \`#${fragment}\` is invalid: line numbers start at 1`, ...loc() });
+        report({ message: `${label} \`#${fragment}\` is invalid: line numbers start at 1`, loc: loc() });
       } else if (range.end < range.start) {
         report({
           message: `Line range \`#${fragment}\` ends before it starts`,
           help: "Put the lower line number first.",
-          ...loc(),
+          loc: loc(),
         });
       } else if (range.end > lineCount) {
         report({
           message: `${label} \`#${fragment}\` is out of range: ${where} has ${lineCount} line${lineCount === 1 ? "" : "s"}`,
           help: "The file has probably changed since the link was written. Update the line numbers.",
-          ...loc(),
+          loc: loc(),
         });
       }
     };
@@ -104,24 +110,24 @@ export const noBrokenReference: Rule<NoBrokenReferenceOptions> = {
       const plainView = queryIndex !== -1 && PLAIN_QUERY_RE.test(beforeHash.slice(queryIndex));
       const fragment = hashIndex === -1 ? null : target.slice(hashIndex + 1);
       const lineRange = fragment === null ? null : parseLineFragment(fragment);
-      const loc = () => locateInNode(file.text, file.lineStarts, node, url);
+      const loc = () => locateInNode(sourceCode, node, url);
       // GitHub renders Markdown, where `#L42` is a heading anchor. Lines are numbered only in
       // other files and in the source view of Markdown (`?plain=1`).
       const usesLines = (path: string) => lineRange !== null && (plainView || !isMarkdownPath(path));
 
       if (!pathPart) {
         if (!fragment || fragment.toLowerCase() === "top") return;
-        if (lineRange && usesLines(file.path)) {
-          if (options.checkLines) checkLineRange(fragment, lineRange, countLines(file.text), "this file", loc);
+        if (lineRange && usesLines(filename)) {
+          if (options.checkLines) checkLineRange(fragment, lineRange, countLines(sourceCode.text), "this file", loc);
           return;
         }
         if (!options.checkAnchors) return;
-        ownAnchors ??= normalizeAnchors(collectAnchors(file.ast));
+        ownAnchors ??= normalizeAnchors(collectAnchors(sourceCode.ast));
         if (ownAnchors.has(normalizeAnchor(fragment))) return;
         report({
           message: `Anchor \`#${fragment}\` does not match any heading in this file`,
           help: "Anchors use GitHub-style heading slugs (lowercase, spaces replaced by `-`).",
-          ...loc(),
+          loc: loc(),
         });
         return;
       }
@@ -139,7 +145,7 @@ export const noBrokenReference: Rule<NoBrokenReferenceOptions> = {
         report({
           message: `Link target \`${pathPart}\` does not exist`,
           help: `Resolved to \`${relative(project.root, abs) || "."}\` (relative to this file).`,
-          ...loc(),
+          loc: loc(),
         });
         return;
       }
@@ -154,18 +160,20 @@ export const noBrokenReference: Rule<NoBrokenReferenceOptions> = {
           report({
             message: `Anchor \`#${fragment}\` does not match any heading in \`${pathPart}\``,
             help: "Anchors use GitHub-style heading slugs (lowercase, spaces replaced by `-`).",
-            ...loc(),
+            loc: loc(),
           });
         }
       }
     };
 
-    visit(file.ast, ["link", "image", "definition", "html"], (node) => {
-      if (node.type === "html") {
+    const checkNode = (node: Link | Image | Definition) => checkUrl(node.url, node);
+    return {
+      link: checkNode,
+      image: checkNode,
+      definition: checkNode,
+      html(node) {
         for (const match of node.value.matchAll(HTML_ATTR_RE)) checkUrl(match[1] as string, node);
-      } else {
-        checkUrl(node.url, node);
-      }
-    });
+      },
+    };
   },
 };

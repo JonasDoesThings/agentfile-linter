@@ -18,7 +18,9 @@ modeled on oxlint. See [README.md](README.md) for user-facing behavior.
 - `bun run check` runs formatting check, lint, typecheck, tests and self-lint. Run it before
   finishing a change.
 - `bun run build` builds `dist/agentfile-linter`. `bun run build:all` cross-compiles for every target.
-- `bun run build:npm` builds the Node.js CLI at `dist/cli.js`. npm runs it before packing.
+- `bun run build:npm` builds the Node.js CLI at `dist/cli.js` and the type declarations for plugin
+  authors in `dist/types/` (from `src/plugin-types.ts`, with `tsconfig.types.json`). npm runs it
+  before packing.
 - `bun run schema` regenerates `configuration_schema.json`. A test fails if the file is stale.
 - `bun run lint:self` lints this repository with itself.
 
@@ -39,8 +41,14 @@ modeled on oxlint. See [README.md](README.md) for user-facing behavior.
 - `src/linter.ts`: config setup, file collection (`collectFiles`, also used by
   `--debug files`), per-file rule execution, and the tree pass that runs `checkTree` hooks
   over the discovered directories.
+- `src/rule-runner.ts`: runs the ESLint-style `create` / `createOnce` visitors of all rules in
+  one walk of a file's mdast (selectors are matched with esquery, as in ESLint), and turns
+  `report()` calls into diagnostics. `src/source-code.ts` is `context.sourceCode`.
 - `src/config.ts`: config loading and validation, plus `RuleResolver`. Settings layer in this
   order: defaults → categories → rules → overrides → CLI flags.
+- `src/plugins.ts`: loads `jsPlugins` (Oxlint's config format) and names them as Oxlint does.
+  `src/plugin-types.ts` lists the types published for plugin authors. Keep the types it reaches
+  free of Node.js and Bun types, so that plugins don't need them.
 - `src/project.ts`: cached fs access, gitignore, a lazy index of project files, `findUp`,
   `resolveExisting`, `memo`.
 - `src/workspace.ts`: package.json and workspace (pnpm/npm/yarn/bun) resolution.
@@ -48,8 +56,9 @@ modeled on oxlint. See [README.md](README.md) for user-facing behavior.
 - `src/frontmatter.ts`: YAML frontmatter extraction and parsing, with source locations for
   syntax errors and duplicate keys.
 - `src/git.ts`: Git queries (last commit time, uncommitted changes) with a process limit.
-- `src/rules/`: one file per rule, plus its `<rule>.test.ts`. Rules are registered in
-  `src/rules/index.ts`.
+- `src/rules/`: one file per rule, plus its `<rule>.test.ts`. Rules are registered in the
+  built-in `agentfile` plugin in `src/rules/index.ts`, which also has `RuleRegistry`, the rules
+  of a run by full name.
 - `src/runners/`: task runners used by `agentfile/no-missing-script`, one module per ecosystem
   (`node`, `deno`, `make`, `just`, `task`, `python`, `jvm`, `composer`, `cargo`), each with its
   tests. They are registered in `src/runners/index.ts`. Shared helpers (`parseArgs`,
@@ -58,12 +67,14 @@ modeled on oxlint. See [README.md](README.md) for user-facing behavior.
 
 ## Adding a rule
 
-1. Create `src/rules/<name>.ts` exporting a `Rule` with `meta` (name `agentfile/<name>`,
-   `categories`, `defaultSeverity`, option `schema`), `defaultOptions` and `check()`. Rules
-   about things other than context files (such as skill directories) implement `checkTree()`
-   instead. It runs once per lint run and reports by path. Rules with no category are off by
-   default.
-2. Register it in `src/rules/index.ts`.
+1. Create `src/rules/<name>.ts` exporting a `Rule` in the shape of an ESLint rule: `meta`
+   (`docs.description`, `docs.category` with one of Oxlint's categories, `docs.recommended`
+   to turn it on by default, option `schema` as an array with one JSON schema per option,
+   `defaultOptions`) and `create(context)`, which returns mdast node visitors. Rules about
+   things other than context files (such as skill directories) implement `checkTree()`
+   instead. It runs once per lint run and reports by path. Rules that aren't recommended are
+   off by default.
+2. Register it in `BUILTIN_PLUGIN` in `src/rules/index.ts`.
 3. Run `bun run schema`, add `src/rules/<name>.test.ts`, and document the rule in `README.md`.
 
 ## Adding a task runner

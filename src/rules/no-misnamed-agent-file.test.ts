@@ -175,14 +175,14 @@ describe("agentfile/no-misnamed-agent-file", () => {
     ]);
   });
 
-  test("misnamed files are listed as linted files", () => {
+  test("misnamed files are listed as linted files", async () => {
     const root = makeProject({
       "AGENTS.md": CONTENT,
       ".claude/skills/deploy/skill.md": SKILL,
       "packages/a/package.json": { name: "a" },
       "packages/a/claude.md": CONTENT,
     });
-    expect(collectFiles({ cwd: root, config: false })).toEqual([
+    expect(await collectFiles({ cwd: root, config: false })).toEqual([
       join(root, ".claude/skills/deploy/skill.md"),
       join(root, "AGENTS.md"),
       join(root, "packages/a/claude.md"),

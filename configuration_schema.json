@@ -7,6 +7,35 @@
     "$schema": {
       "type": "string"
     },
+    "jsPlugins": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "required": [
+              "name",
+              "specifier"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Name of the plugin: the prefix of its rules."
+              },
+              "specifier": {
+                "type": "string",
+                "description": "Path (relative to the config file) or package name."
+              }
+            }
+          }
+        ]
+      },
+      "description": "ESLint or Oxlint plugins with custom rules, as in Oxlint: paths (relative to the config file) or package names. Use an object to name the plugin."
+    },
     "files": {
       "type": "array",
       "items": {
@@ -17,7 +46,7 @@
     },
     "categories": {
       "type": "object",
-      "description": "Severity for all rules in a category.",
+      "description": "Severity for all built-in rules in a category.",
       "properties": {
         "recommended": {
           "oneOf": [
@@ -39,7 +68,169 @@
                 2
               ]
             }
-          ]
+          ],
+          "description": "Rules that are on by default"
+        },
+        "correctness": {
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": [
+                "off",
+                "warn",
+                "error",
+                "allow",
+                "deny"
+              ]
+            },
+            {
+              "type": "integer",
+              "enum": [
+                0,
+                1,
+                2
+              ]
+            }
+          ],
+          "description": "Instructions that are wrong, such as references to files or scripts that don't exist"
+        },
+        "suspicious": {
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": [
+                "off",
+                "warn",
+                "error",
+                "allow",
+                "deny"
+              ]
+            },
+            {
+              "type": "integer",
+              "enum": [
+                0,
+                1,
+                2
+              ]
+            }
+          ],
+          "description": "Instructions that are most likely wrong"
+        },
+        "pedantic": {
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": [
+                "off",
+                "warn",
+                "error",
+                "allow",
+                "deny"
+              ]
+            },
+            {
+              "type": "integer",
+              "enum": [
+                0,
+                1,
+                2
+              ]
+            }
+          ],
+          "description": "Stricter rules, with occasional false positives"
+        },
+        "style": {
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": [
+                "off",
+                "warn",
+                "error",
+                "allow",
+                "deny"
+              ]
+            },
+            {
+              "type": "integer",
+              "enum": [
+                0,
+                1,
+                2
+              ]
+            }
+          ],
+          "description": "Setups that could be simpler or more idiomatic"
+        },
+        "restriction": {
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": [
+                "off",
+                "warn",
+                "error",
+                "allow",
+                "deny"
+              ]
+            },
+            {
+              "type": "integer",
+              "enum": [
+                0,
+                1,
+                2
+              ]
+            }
+          ],
+          "description": "Rules that forbid things some projects want to avoid"
+        },
+        "nursery": {
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": [
+                "off",
+                "warn",
+                "error",
+                "allow",
+                "deny"
+              ]
+            },
+            {
+              "type": "integer",
+              "enum": [
+                0,
+                1,
+                2
+              ]
+            }
+          ],
+          "description": "New rules that are still being developed"
+        },
+        "perf": {
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": [
+                "off",
+                "warn",
+                "error",
+                "allow",
+                "deny"
+              ]
+            },
+            {
+              "type": "integer",
+              "enum": [
+                0,
+                1,
+                2
+              ]
+            }
+          ],
+          "description": "Instructions that cost more context than necessary"
         }
       },
       "additionalProperties": false
@@ -1396,6 +1587,62 @@
           ]
         }
       },
+      "patternProperties": {
+        "^(?!agentfile/).+/[^/]+$": {
+          "oneOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "warn",
+                    "error",
+                    "allow",
+                    "deny"
+                  ]
+                },
+                {
+                  "type": "integer",
+                  "enum": [
+                    0,
+                    1,
+                    2
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "warn",
+                        "error",
+                        "allow",
+                        "deny"
+                      ]
+                    },
+                    {
+                      "type": "integer",
+                      "enum": [
+                        0,
+                        1,
+                        2
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "minItems": 1
+            }
+          ]
+        }
+      },
       "additionalProperties": false
     },
     "overrides": {
@@ -1413,6 +1660,35 @@
               "type": "string"
             },
             "minItems": 1
+          },
+          "jsPlugins": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "name",
+                    "specifier"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "Name of the plugin: the prefix of its rules."
+                    },
+                    "specifier": {
+                      "type": "string",
+                      "description": "Path (relative to the config file) or package name."
+                    }
+                  }
+                }
+              ]
+            },
+            "description": "ESLint or Oxlint plugins with custom rules, as in Oxlint: paths (relative to the config file) or package names. Use an object to name the plugin."
           },
           "rules": {
             "type": "object",
@@ -2766,6 +3042,62 @@
                 ]
               }
             },
+            "patternProperties": {
+              "^(?!agentfile/).+/[^/]+$": {
+                "oneOf": [
+                  {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "warn",
+                          "error",
+                          "allow",
+                          "deny"
+                        ]
+                      },
+                      {
+                        "type": "integer",
+                        "enum": [
+                          0,
+                          1,
+                          2
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "prefixItems": [
+                      {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "off",
+                              "warn",
+                              "error",
+                              "allow",
+                              "deny"
+                            ]
+                          },
+                          {
+                            "type": "integer",
+                            "enum": [
+                              0,
+                              1,
+                              2
+                            ]
+                          }
+                        ]
+                      }
+                    ],
+                    "minItems": 1
+                  }
+                ]
+              }
+            },
             "additionalProperties": false
           }
         }
@@ -2777,6 +3109,10 @@
         "type": "string"
       },
       "description": "Gitignore-style patterns of files that are not linted."
+    },
+    "settings": {
+      "type": "object",
+      "description": "Settings shared by all rules, which read them as `context.settings`."
     },
     "reportUnnecessarySuppressions": {
       "type": "boolean",

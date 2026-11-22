@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, type Stats, statSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { GitIgnoreTree, toPosix } from "./gitignore.ts";
@@ -39,10 +39,22 @@ interface ProjectIndex {
  * with caching, gitignore evaluation, a lazily built index of all files, and
  * package/workspace information. Shared by all rules and files.
  */
+/**
+ * What {@link Project.stat} returns: a subset of Node.js's `fs.Stats`, so that the published types
+ * of plugins (which include `Project`) don't need Node.js's types.
+ */
+export interface FileStats {
+  readonly mode: number;
+  readonly size: number;
+  readonly mtimeMs: number;
+  isFile(): boolean;
+  isDirectory(): boolean;
+}
+
 export class Project {
   readonly gitignore: GitIgnoreTree;
   readonly workspaces: Workspaces;
-  private readonly statCache = new Map<string, Stats | null>();
+  private readonly statCache = new Map<string, FileStats | null>();
   private readonly dirCache = new Map<string, string[] | null>();
   private readonly anchorCache = new Map<string, Set<string> | null>();
   private readonly memoCache = new Map<string, unknown>();
@@ -54,7 +66,7 @@ export class Project {
   }
 
   /** Stats a path (following symlinks). Returns null when it doesn't exist. */
-  stat(absPath: string): Stats | null {
+  stat(absPath: string): FileStats | null {
     let s = this.statCache.get(absPath);
     if (s === undefined) {
       try {

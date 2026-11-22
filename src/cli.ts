@@ -3,13 +3,13 @@ import { existsSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
 import pkg from "#package.json" with { type: "json" };
-import { RULES } from "#src/rules/index.ts";
+import type { RuleRegistry } from "#src/rules/index.ts";
 
 import { HELP, parseArgs, UsageError } from "./args.ts";
 import { shouldUseColor } from "./colors.ts";
 import { CONFIG_FILE_NAMES, ConfigError } from "./config.ts";
 import { format } from "./formatters.ts";
-import { collectFiles, lint, setup } from "./linter.ts";
+import { availableRules, collectFiles, lint, setup } from "./linter.ts";
 
 const INIT_CONFIG = `{
   // Severity for every rule in a category: "off" | "warn" | "error"
@@ -27,12 +27,12 @@ const INIT_CONFIG = `{
 const out = (s: string) => process.stdout.write(s);
 const err = (s: string) => process.stderr.write(s);
 
-function listRules(): string {
-  const rows = [...RULES.values()].map((r) => [
-    r.meta.name,
-    r.meta.categories.join(", ") || "-",
-    r.meta.defaultSeverity,
-    r.meta.description,
+function listRules(registry: RuleRegistry): string {
+  const rows = [...registry.rules].map(([name, rule]) => [
+    name,
+    registry.categoryOf(name) ?? "-",
+    registry.isRecommended(name) ? "error" : "off",
+    rule.meta?.docs?.description ?? "",
   ]);
   const header = ["Rule", "Category", "Default", "Description"];
   const widths = header.map((h, i) => Math.max(h.length, ...rows.map((r) => (r[i] as string).length)));
@@ -59,10 +59,6 @@ export async function main(argv: string[]): Promise<number> {
     }
     if (args.version) {
       out(`agentfile-linter ${pkg.version}\n`);
-      return 0;
-    }
-    if (args.listRules) {
-      out(`${listRules()}\n`);
       return 0;
     }
     if (args.init) {
@@ -92,7 +88,14 @@ export async function main(argv: string[]): Promise<number> {
       ignorePath: args.ignorePath,
       noIgnore: args.noIgnore,
     };
-    const prepared = setup(options);
+    if (args.listRules) {
+      // Works with a broken config too, which helps to fix it: problems go below the list.
+      const { registry, problems } = await availableRules(options);
+      out(`${listRules(registry)}\n`);
+      if (problems.length) err(`\n${problems.map((problem) => `agentfile-linter: ${problem}\n`).join("")}`);
+      return 0;
+    }
+    const prepared = await setup(options);
     if (args.printConfig) {
       const description = {
         configFile: prepared.config.path ? relative(prepared.cwd, prepared.config.path) || prepared.config.path : null,
@@ -103,7 +106,7 @@ export async function main(argv: string[]): Promise<number> {
     }
 
     if (args.debug.includes("files")) {
-      for (const file of collectFiles(options, prepared)) out(`${relative(prepared.cwd, file) || file}\n`);
+      for (const file of await collectFiles(options, prepared)) out(`${relative(prepared.cwd, file) || file}\n`);
       return 0;
     }
 
