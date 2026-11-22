@@ -24,26 +24,14 @@ Finished in 14ms on 3 files with 4 rules.
 Run the CLI from npm with Node.js 22.17 or newer.
 
 ```sh
+# Run without adding a project dependency
 pnpx agentfile-linter
 npx agentfile-linter
-```
 
-To pin the CLI in a project or run it from a package script, install it as a dev dependency.
-
-```sh
+# Pin it in a project or run it from a package script
 npm install --save-dev agentfile-linter
 npm exec -- agentfile-linter
 ```
-
-You can also build a standalone executable from source with [Bun](https://bun.sh).
-
-```sh
-bun install
-bun run build                       # -> dist/agentfile-linter (current platform)
-bun run build:all                   # -> dist/agentfile-linter-<os>-<arch> for every supported target
-```
-
-During development you can also run it from source: `bun run src/cli.ts .`
 
 ## Usage
 
@@ -59,6 +47,22 @@ agentfile-linter --debug files           # print the files that would be linted,
 ```
 
 With no config file and no rule flags, every rule in the `recommended` category runs as an `error`.
+
+### Rules
+
+| Rule                                                                             | Category    | Checks                                                                    |
+| -------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------- |
+| [`agentfile/no-missing-path`](#agentfileno-missing-path)                         | recommended | Referenced files and directories exist                                    |
+| [`agentfile/no-missing-script`](#agentfileno-missing-script)                     | recommended | Documented scripts and tasks (npm, make, just, uv, maven, cargo, …) exist |
+| [`agentfile/no-broken-reference`](#agentfileno-broken-reference)                 | recommended | Relative links, images, `#anchors` and `#L42` line fragments resolve      |
+| [`agentfile/no-agent-files-drift`](#agentfileno-agent-files-drift)               | recommended | Agent files in one directory are identical or symlinked                   |
+| [`agentfile/no-invalid-skill`](#agentfileno-invalid-skill)                       | recommended | Skill directories have a valid layout and valid `SKILL.md` frontmatter    |
+| [`agentfile/no-misnamed-agent-file`](#agentfileno-misnamed-agent-file)           | recommended | Agent files are spelled in the exact case agents look for                 |
+| [`agentfile/no-unnecessary-agent-files`](#agentfileno-unnecessary-agent-files)   | –           | No `CLAUDE.md` that only mirrors `AGENTS.md`                              |
+| [`agentfile/keep-agents-file-up-to-date`](#agentfilekeep-agents-file-up-to-date) | –           | Context files were changed recently                                       |
+| [`agentfile/limit-file-size`](#agentfilelimit-file-size)                         | –           | Context files stay below a maximum number of characters                   |
+
+Rules in the `recommended` category run by default. The others are off until you enable them in `rules`, e.g. `"agentfile/keep-agents-file-up-to-date": "warn"`.
 
 ### Linted files
 
@@ -158,21 +162,10 @@ kind of file) is never reported. Neither is a directive that
 its problems depend on the current date. Set `"reportUnnecessarySuppressions": false` in the config
 to turn these reports off.
 
-## Rules
+## Rule details
 
-| Rule                                                                             | Category    | Checks                                                                    |
-| -------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------- |
-| [`agentfile/no-missing-path`](#agentfileno-missing-path)                         | recommended | Referenced files and directories exist                                    |
-| [`agentfile/no-missing-script`](#agentfileno-missing-script)                     | recommended | Documented scripts and tasks (npm, make, just, uv, maven, cargo, …) exist |
-| [`agentfile/no-broken-reference`](#agentfileno-broken-reference)                 | recommended | Relative links, images, `#anchors` and `#L42` line fragments resolve      |
-| [`agentfile/no-agent-files-drift`](#agentfileno-agent-files-drift)               | recommended | Agent files in one directory are identical or symlinked                   |
-| [`agentfile/no-invalid-skill`](#agentfileno-invalid-skill)                       | recommended | Skill directories have a valid layout and valid `SKILL.md` frontmatter    |
-| [`agentfile/no-misnamed-agent-file`](#agentfileno-misnamed-agent-file)           | recommended | Agent files are spelled in the exact case agents look for                 |
-| [`agentfile/no-unnecessary-agent-files`](#agentfileno-unnecessary-agent-files)   | –           | No `CLAUDE.md` that only mirrors `AGENTS.md`                              |
-| [`agentfile/keep-agents-file-up-to-date`](#agentfilekeep-agents-file-up-to-date) | –           | Context files were changed recently                                       |
-| [`agentfile/limit-file-size`](#agentfilelimit-file-size)                         | –           | Context files stay below a maximum number of characters                   |
-
-Rules in the `recommended` category run by default. The others are off until you enable them in `rules`, e.g. `"agentfile/keep-agents-file-up-to-date": "warn"`.
+<details>
+<summary>Descriptions and options for every rule</summary>
 
 ### `agentfile/no-missing-path`
 
@@ -365,6 +358,8 @@ Off by default. Reports context files with more than `maxChars` characters. Agen
 
 The default is about 5,000 tokens of English text. It leaves room for the `AGENTS.md` files of parent directories within Codex's 32 KiB.
 
+</details>
+
 ## Programmatic API
 
 ```ts
@@ -384,6 +379,14 @@ bun run fmt         # oxfmt, `fmt:check` to verify
 bun run check       # everything above plus tests and self-lint
 bun run schema      # regenerate configuration_schema.json after changing rule options
 bun run lint:self   # lint this repository's own AGENTS.md
+```
+
+Run the CLI from source with `bun run src/cli.ts .`. To build standalone executables with [Bun](https://bun.sh):
+
+```sh
+bun install
+bun run build      # dist/agentfile-linter for the current platform
+bun run build:all  # dist/agentfile-linter-<os>-<arch> for every supported target
 ```
 
 Imports outside the current directory use the `package.json` subpath imports `#src/*` and `#test/*`, e.g. `import { lint } from "#src/linter.ts"`.
