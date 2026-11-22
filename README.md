@@ -58,6 +58,7 @@ With no config file and no rule flags, every rule marked as recommended in the t
 | [`agentfile/no-agent-files-drift`](#agentfileno-agent-files-drift)               | ✓           | suspicious  | Agent files in one directory are identical or symlinked                   |
 | [`agentfile/no-invalid-skill`](#agentfileno-invalid-skill)                       | ✓           | correctness | Skill directories have a valid layout and valid `SKILL.md` frontmatter    |
 | [`agentfile/no-misnamed-agent-file`](#agentfileno-misnamed-agent-file)           | ✓           | correctness | Agent files are spelled in the exact case agents look for                 |
+| [`agentfile/no-claude-local-in-git`](#agentfileno-claude-local-in-git)           | ✓           | correctness | Personal `CLAUDE.local.md` files stay untracked and git-ignored           |
 | [`agentfile/no-unnecessary-agent-files`](#agentfileno-unnecessary-agent-files)   |             | pedantic    | No `CLAUDE.md` that only mirrors `AGENTS.md`                              |
 | [`agentfile/keep-agents-file-up-to-date`](#agentfilekeep-agents-file-up-to-date) |             | pedantic    | Context files were changed recently                                       |
 | [`agentfile/limit-file-size`](#agentfilelimit-file-size)                         |             | pedantic    | Context files stay below a maximum number of characters                   |
@@ -68,7 +69,7 @@ Each rule belongs to one category, named as in [Oxlint](https://oxc.rs/docs/guid
 
 ### Linted files
 
-By default, agentfile-linter finds these files in every directory: `AGENTS.md`, `AGENT.md`, `CLAUDE.md`, `CLAUDE.local.md` and `GEMINI.md`. `.claude/` and other hidden directories are included. Discovery skips files excluded by `.gitignore`.
+By default, agentfile-linter finds these files in every directory: `AGENTS.md`, `AGENT.md`, `CLAUDE.md`, `CLAUDE.local.md` and `GEMINI.md`. `.claude/` and other hidden directories are included. Context file discovery skips files excluded by `.gitignore`.
 
 Files you name on the command line can have any name and bypass `.gitignore`. A file explicitly excluded by `ignorePatterns`, `--ignore-pattern`, or the ignore file is skipped with a warning. Use `--no-ignore` to lint it.
 
@@ -125,7 +126,7 @@ Besides context files, [`agentfile/no-invalid-skill`](#agentfileno-invalid-skill
 }
 ```
 
-Settings are applied in this order: built-in defaults (`recommended` rules as errors), then `categories`, then `rules`, then matching `overrides`, then CLI flags. Each layer only changes what it mentions, including individual keys in a rule's options object. The example above keeps `no-broken-reference`, `no-agent-files-drift`, `no-invalid-skill` and `no-misnamed-agent-file` enabled. To opt out entirely, use `"categories": { "recommended": "off" }` or `-A all`.
+Settings are applied in this order: built-in defaults (`recommended` rules as errors), then `categories`, then `rules`, then matching `overrides`, then CLI flags. Each layer only changes what it mentions, including individual keys in a rule's options object. The example above keeps the other recommended rules enabled. To opt out entirely, use `"categories": { "recommended": "off" }` or `-A all`.
 
 Glob patterns (`files`, `overrides[].files`, `ignorePatterns`) are resolved relative to the config file. A pattern without a `/` matches a file name in any directory.
 
@@ -334,6 +335,14 @@ Agents look for `AGENTS.md`, `AGENT.md`, `CLAUDE.md`, `CLAUDE.local.md` and `GEM
 A file is never reported when the correctly named file exists next to it (possible on case-sensitive file systems) or when it matches the [`files`](#options) patterns, and git-ignored files are skipped unless named on the command line. A `SKILL.md` in the wrong case is reported by [`agentfile/no-invalid-skill`](#agentfileno-invalid-skill). Rename tracked files with `git mv`: on case-insensitive file systems, Git doesn't notice a plain rename that only changes case.
 
 </details>
+
+### `agentfile/no-claude-local-in-git`
+
+Reports personal `CLAUDE.local.md` files that Git tracks or that lack a matching `.gitignore` pattern in the repository. Add `CLAUDE.local.md` to the repository's `.gitignore` so the pattern applies at every depth. A global ignore file or `.git/info/exclude` is local to your checkout or machine.
+
+A file ignored only by `.git/info/exclude` or a global ignore file is still reported, with its own message: those excludes are not shared, so a teammate or a config change can commit it.
+
+Git keeps tracking existing index entries after you add an ignore pattern. The help text shows the `git rm --cached` command that removes the file from the index and keeps your local copy. Index entries without a file in the working tree (deleted without `git rm`, or left out of a sparse checkout) are reported too. The rule runs only inside Git repositories and doesn't follow symlinked directories into other repositories.
 
 ### `agentfile/no-unnecessary-agent-files`
 

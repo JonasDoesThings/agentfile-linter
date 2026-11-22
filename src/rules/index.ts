@@ -5,6 +5,7 @@ import { keepAgentsFileUpToDate } from "./keep-agents-file-up-to-date.ts";
 import { limitFileSize } from "./limit-file-size.ts";
 import { noAgentFilesDrift } from "./no-agent-files-drift.ts";
 import { noBrokenReference } from "./no-broken-reference.ts";
+import { noClaudeLocalInGit } from "./no-claude-local-in-git.ts";
 import { noInvalidSkill } from "./no-invalid-skill.ts";
 import { noMisnamedAgentFile } from "./no-misnamed-agent-file.ts";
 import { noMissingPath } from "./no-missing-path.ts";
@@ -24,6 +25,7 @@ export const BUILTIN_PLUGIN = {
     "no-agent-files-drift": noAgentFilesDrift,
     "no-invalid-skill": noInvalidSkill,
     "no-misnamed-agent-file": noMisnamedAgentFile,
+    "no-claude-local-in-git": noClaudeLocalInGit,
     "no-unnecessary-agent-files": noUnnecessaryAgentFiles,
     "keep-agents-file-up-to-date": keepAgentsFileUpToDate,
     "limit-file-size": limitFileSize,

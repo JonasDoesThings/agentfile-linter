@@ -156,8 +156,7 @@ async function lintFile(
 }
 
 /**
- * Discovers the files `lint` would check, including additional rule inputs.
- * Ignored files are excluded and the returned absolute paths are sorted.
+ * Returns the sorted absolute paths of files `lint` would check, including additional rule inputs.
  */
 export async function collectFiles(options: LintOptions, prepared?: LintSetup): Promise<string[]> {
   prepared ??= await setup(options);
@@ -330,14 +329,19 @@ function collectInputs(options: LintOptions, prepared: LintSetup, registry: Proj
     }
   }
 
-  const isIgnored = (absPath: string, isDir: boolean): boolean => {
+  const isIgnored: DiscoveryInputs["isIgnored"] = (absPath, isDir, { gitignore = true } = {}) => {
     const project = registry.forDirectory(dirname(absPath));
-    if (options.noIgnore)
-      return project
+    if (
+      project
         .relative(absPath)
         .split("/")
-        .some((s) => ALWAYS_SKIPPED_DIRS.has(s));
-    return project.isIgnored(absPath, isDir) || ignores.some((ig) => ig.isIgnored(absPath, isDir));
+        .some((s) => ALWAYS_SKIPPED_DIRS.has(s))
+    )
+      return true;
+    return (
+      !options.noIgnore &&
+      ((gitignore && project.gitignore.isIgnored(absPath, isDir)) || ignores.some((ig) => ig.isIgnored(absPath, isDir)))
+    );
   };
 
   const discovery = discoverFiles({

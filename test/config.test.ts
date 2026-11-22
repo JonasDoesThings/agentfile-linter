@@ -19,6 +19,7 @@ const ALL_ERROR: Record<string, string> = {
   "agentfile/no-agent-files-drift": "error",
   "agentfile/no-invalid-skill": "error",
   "agentfile/no-misnamed-agent-file": "error",
+  "agentfile/no-claude-local-in-git": "error",
 };
 
 describe("rule resolution", () => {
@@ -47,6 +48,7 @@ describe("rule resolution", () => {
       "agentfile/no-agent-files-drift": "error",
       "agentfile/no-invalid-skill": "warn",
       "agentfile/no-misnamed-agent-file": "warn",
+      "agentfile/no-claude-local-in-git": "warn",
     });
   });
 
@@ -59,7 +61,7 @@ describe("rule resolution", () => {
     ]);
     expect(enabled(resolver)).toEqual({ "agentfile/no-missing-path": "error", "agentfile/no-missing-script": "warn" });
     const categories = new RuleResolver(config, [{ severity: "warn", target: "recommended" }]);
-    expect(Object.values(enabled(categories))).toEqual(["warn", "warn", "warn", "warn", "warn", "warn"]);
+    expect(Object.values(enabled(categories))).toEqual(Object.keys(ALL_ERROR).map(() => "warn"));
   });
 
   test("categories select built-in rules by `docs.category`", () => {
@@ -71,6 +73,7 @@ describe("rule resolution", () => {
       "agentfile/no-agent-files-drift": "error",
       "agentfile/no-invalid-skill": "warn",
       "agentfile/no-misnamed-agent-file": "warn",
+      "agentfile/no-claude-local-in-git": "warn",
       "agentfile/no-unnecessary-agent-files": "error",
       "agentfile/keep-agents-file-up-to-date": "error",
       "agentfile/limit-file-size": "error",

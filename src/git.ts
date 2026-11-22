@@ -1,10 +1,13 @@
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { realpathSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { devNull } from "node:os";
 import { basename, dirname } from "node:path";
 import { promisify } from "node:util";
 
 const exec = promisify(execFile);
+const GIT_ARGS = ["--no-optional-locks", "-c", "core.fsmonitor=false"];
 
 /** Maximum number of git processes running at the same time. */
 const MAX_PARALLEL = 8;
@@ -49,20 +52,112 @@ function gitEnv(): Record<string, string | undefined> {
 function git(cwd: string, args: string[]): Promise<string | null> {
   return withSlot(async () => {
     try {
-      const { stdout } = await exec(
-        "git",
-        ["--literal-pathspecs", "--no-optional-locks", "-c", "core.fsmonitor=false", ...args],
-        {
-          cwd,
-          env: gitEnv(),
-          windowsHide: true,
-        },
-      );
+      const { stdout } = await exec("git", ["--literal-pathspecs", ...GIT_ARGS, ...args], {
+        cwd,
+        env: gitEnv(),
+        windowsHide: true,
+      });
       return stdout;
     } catch {
       return null;
     }
   });
+}
+
+/**
+ * `-c safe.directory=<repository>`. Global config is ignored where results must not depend on the
+ * machine, so a repository owned by another user (a container mount, a CI checkout) would be refused.
+ * Command-line config is protected configuration, so Git honors `safe.directory` from it.
+ */
+function trustRepository(cwd: string): string[] {
+  let root = cwd;
+  try {
+    root = realpathSync(cwd);
+  } catch {
+    // Git fails on its own below.
+  }
+  return ["-c", `safe.directory=${root.replaceAll("\\", "/")}`];
+}
+
+export interface LocalFileEntry {
+  /** Relative to the repository root. */
+  path: string;
+  tracked: boolean;
+  /** Whether the index entry is marked skip-worktree, as in a sparse checkout. */
+  skipWorktree: boolean;
+}
+
+/** Lists index entries and untracked paths that are not ignored by a per-directory .gitignore. */
+export function listTrackedAndUnignoredFiles(cwd: string, pathspecs: string[]): LocalFileEntry[] {
+  let out: string;
+  try {
+    // --exclude-standard would also read private excludes. --cached includes ignored index entries.
+    out = execFileSync(
+      "git",
+      [
+        ...GIT_ARGS,
+        ...trustRepository(cwd),
+        "--no-literal-pathspecs",
+        "ls-files",
+        "-tz",
+        "--stage",
+        "--cached",
+        "--others",
+        "--exclude-per-directory=.gitignore",
+        "--",
+        ...pathspecs,
+      ],
+      {
+        cwd,
+        encoding: "utf8",
+        // Global and system config (`core.ignoreCase`, for example) must not change the result.
+        env: {
+          ...gitEnv(),
+          GIT_CONFIG_GLOBAL: devNull,
+          GIT_CONFIG_NOSYSTEM: "1",
+          GIT_CONFIG_COUNT: "0",
+          GIT_CONFIG_PARAMETERS: undefined,
+        },
+        stdio: ["ignore", "pipe", "ignore"],
+        windowsHide: true,
+      },
+    );
+  } catch {
+    return [];
+  }
+  const files: LocalFileEntry[] = [];
+  for (const entry of out.split("\0")) {
+    if (!entry || entry.endsWith("/")) continue;
+    const tracked = !entry.startsWith("? ");
+    if (tracked && entry.startsWith("160000 ", 2)) continue; // Gitlink (submodule).
+    const path = tracked ? entry.slice(entry.indexOf("\t") + 1) : entry.slice(2);
+    files.push({ path, tracked, skipWorktree: entry.startsWith("S ") });
+  }
+  return files;
+}
+
+/**
+ * The untracked `paths` (relative to the repository root) that Git ignores anyway. Only private
+ * excludes (`.git/info/exclude`, `core.excludesFile`) can match paths that
+ * {@link listTrackedAndUnignoredFiles} returned, so the user's global config is read here.
+ */
+export function listPrivatelyIgnored(cwd: string, paths: string[]): Set<string> {
+  if (!paths.length) return new Set();
+  let out: string;
+  try {
+    out = execFileSync("git", [...GIT_ARGS, ...trustRepository(cwd), "check-ignore", "-z", "--stdin"], {
+      cwd,
+      encoding: "utf8",
+      env: gitEnv(),
+      input: paths.map((path) => `${path}\0`).join(""),
+      stdio: ["pipe", "pipe", "ignore"],
+      windowsHide: true,
+    });
+  } catch (error) {
+    // Exit code 1: none of the paths is ignored.
+    out = (error as { stdout?: string }).stdout ?? "";
+  }
+  return new Set(out.split("\0").filter(Boolean));
 }
 
 export interface CommitTime {

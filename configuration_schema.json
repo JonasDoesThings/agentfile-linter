@@ -1148,6 +1148,118 @@
             }
           ]
         },
+        "agentfile/no-claude-local-in-git": {
+          "description": "Personal CLAUDE.local.md files must be untracked and covered by .gitignore",
+          "oneOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "warn",
+                    "error",
+                    "allow",
+                    "deny"
+                  ]
+                },
+                {
+                  "type": "integer",
+                  "enum": [
+                    0,
+                    1,
+                    2
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "warn",
+                        "error",
+                        "allow",
+                        "deny"
+                      ]
+                    },
+                    {
+                      "type": "integer",
+                      "enum": [
+                        0,
+                        1,
+                        2
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "minItems": 1,
+              "maxItems": 1
+            }
+          ]
+        },
+        "no-claude-local-in-git": {
+          "description": "Personal CLAUDE.local.md files must be untracked and covered by .gitignore",
+          "oneOf": [
+            {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "warn",
+                    "error",
+                    "allow",
+                    "deny"
+                  ]
+                },
+                {
+                  "type": "integer",
+                  "enum": [
+                    0,
+                    1,
+                    2
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "warn",
+                        "error",
+                        "allow",
+                        "deny"
+                      ]
+                    },
+                    {
+                      "type": "integer",
+                      "enum": [
+                        0,
+                        1,
+                        2
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "minItems": 1,
+              "maxItems": 1
+            }
+          ]
+        },
         "agentfile/no-unnecessary-agent-files": {
           "description": "CLAUDE.md must not merely mirror AGENTS.md, which Claude Code reads itself",
           "oneOf": [
@@ -2549,6 +2661,118 @@
               },
               "no-misnamed-agent-file": {
                 "description": "AGENTS.md, CLAUDE.md, ... must be named in the exact case agents look for",
+                "oneOf": [
+                  {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "warn",
+                          "error",
+                          "allow",
+                          "deny"
+                        ]
+                      },
+                      {
+                        "type": "integer",
+                        "enum": [
+                          0,
+                          1,
+                          2
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "prefixItems": [
+                      {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "off",
+                              "warn",
+                              "error",
+                              "allow",
+                              "deny"
+                            ]
+                          },
+                          {
+                            "type": "integer",
+                            "enum": [
+                              0,
+                              1,
+                              2
+                            ]
+                          }
+                        ]
+                      }
+                    ],
+                    "minItems": 1,
+                    "maxItems": 1
+                  }
+                ]
+              },
+              "agentfile/no-claude-local-in-git": {
+                "description": "Personal CLAUDE.local.md files must be untracked and covered by .gitignore",
+                "oneOf": [
+                  {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "warn",
+                          "error",
+                          "allow",
+                          "deny"
+                        ]
+                      },
+                      {
+                        "type": "integer",
+                        "enum": [
+                          0,
+                          1,
+                          2
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "prefixItems": [
+                      {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "off",
+                              "warn",
+                              "error",
+                              "allow",
+                              "deny"
+                            ]
+                          },
+                          {
+                            "type": "integer",
+                            "enum": [
+                              0,
+                              1,
+                              2
+                            ]
+                          }
+                        ]
+                      }
+                    ],
+                    "minItems": 1,
+                    "maxItems": 1
+                  }
+                ]
+              },
+              "no-claude-local-in-git": {
+                "description": "Personal CLAUDE.local.md files must be untracked and covered by .gitignore",
                 "oneOf": [
                   {
                     "oneOf": [

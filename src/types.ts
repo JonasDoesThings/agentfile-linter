@@ -222,8 +222,8 @@ export interface TreeDiscoveryContext<Options extends unknown[]> {
   explicitFiles: readonly string[];
   /** The project (nearest Git root) a path belongs to. */
   projectFor(dir: string): Project;
-  /** Whether a path is excluded from linting (.gitignore, ignore patterns), as during discovery. */
-  isIgnored(path: string, isDir: boolean): boolean;
+  /** Whether a path is excluded from linting. Pass `gitignore: false` to skip Git's exclusions. */
+  isIgnored(path: string, isDir: boolean, options?: { gitignore?: boolean }): boolean;
   /** Whether a path matches the configured context file patterns (`files`). */
   isContextFile(path: string): boolean;
   /**
