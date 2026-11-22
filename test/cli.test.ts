@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import pkg from "#package.json" with { type: "json" };
+
 import { makeProject } from "./helpers.ts";
 
 const CLI = join(import.meta.dir, "..", "src", "cli.ts");
@@ -121,7 +123,7 @@ describe("cli", () => {
     const printed = JSON.parse((await cli(root, "--print-config", "-A", "no-missing-script")).stdout);
     expect(printed.configFile).toBe(".agentfile-linterrc.json");
     expect(printed.rules["agentfile/no-missing-script"]).toBe("off");
-    expect((await cli(root, "-V")).stdout).toMatch(/^agentfile-linter \d+\.\d+\.\d+\n$/);
+    expect((await cli(root, "-V")).stdout).toBe(`agentfile-linter ${pkg.version}\n`);
     expect((await cli(root, "-h")).stdout).toContain("Usage: agentfile-linter [OPTIONS] [PATH]...");
   });
 
