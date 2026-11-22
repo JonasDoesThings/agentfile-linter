@@ -155,114 +155,15 @@ description: Deploys the app. Use when the user asks for a deployment.
 ---
 ```
 
-A directive with a name that isn't a rule (usually a typo, or a reason without the `--`
-separator) suppresses nothing for that name. agentfile-linter reports each such name as an `info`
-diagnostic, with a suggestion when the name is close to a rule. Infos don't count as warnings or
-errors, so they don't change the exit code, and `--quiet` hides them.
+A directive with a name that isn't a rule (usually a typo, or a reason without the `--` separator) suppresses nothing for that name. agentfile-linter reports each such name as an `info` diagnostic, with a suggestion when the name is close to a rule. Infos don't count as warnings or errors, so they don't change the exit code, and `--quiet` hides them.
 
-Directives that suppress nothing are reported as `info` too: a directive without rule names where no
-rule reports a problem, or a listed rule that reports no problem where the directive applies. Only
-rules that checked the file count, so a directive for a rule that is off (or that doesn't check this
-kind of file) is never reported. Neither is a directive that
-[`agentfile/keep-agents-file-up-to-date`](#agentfilekeep-agents-file-up-to-date) may need, because
-its problems depend on the current date. Set `"reportUnnecessarySuppressions": false` in the config
-to turn these reports off.
+Directives that suppress nothing are reported as `info` too: a directive without rule names where no rule reports a problem, or a listed rule that reports no problem where the directive applies. Only rules that checked the file count, so a directive for a rule that is off (or that doesn't check this kind of file) is never reported. Neither is a directive that [`agentfile/keep-agents-file-up-to-date`](#agentfilekeep-agents-file-up-to-date) may need, because its problems depend on the current date. Set `"reportUnnecessarySuppressions": false` in the config to turn these reports off.
 
 ## Plugins
 
-Custom rules come from plugins in the format of [ESLint](https://eslint.org/docs/latest/extend/plugins)
-and [Oxlint JS plugins](https://oxc.rs/docs/guide/usage/linter/js-plugins.html), loaded with
-Oxlint's `jsPlugins` setting. Rules check the [mdast](https://github.com/syntax-tree/mdast) of
-each context file, the AST that ESLint's Markdown language (`@eslint/markdown`) uses too, so
-the rules of `@eslint/markdown` run unchanged:
+Load custom rules with `jsPlugins` and enable them in `rules` using their`<plugin>/<rule>` names. The [plugin API guide](docs/plugin-api.md) covers configuration, plugin authoring, and compatibility with ESLint and Oxlint.
 
-```jsonc
-{
-  "jsPlugins": [
-    "./lint/agentfile-plugin.js", // a path, relative to the config file
-    "eslint-plugin-example", // a package, from node_modules
-    { "name": "markdown", "specifier": "@eslint/markdown" }, // a package under another name
-  ],
-  "rules": {
-    "markdown/no-empty-links": "error",
-    "example/some-rule": ["warn", { "option": true }],
-  },
-}
-```
-
-A plugin is named by the `name` of its entry, else by its `meta.name`, else by its package name,
-without an `eslint-plugin-` or `oxlint-plugin-` prefix (`eslint-plugin-foo` becomes `foo`,
-`@scope/eslint-plugin-foo` becomes `@scope/foo`). Its rules are named `<plugin>/<rule>`. `agentfile`
-is taken by the built-in rules. `overrides` can have `jsPlugins` too; their rules can be configured
-anywhere. Plugins may be written in TypeScript (with Node.js 22.18 or newer, or the standalone
-executable).
-
-Plugin rules are off until they are enabled in `rules`, `overrides` or with `-W`/`-D`. As in Oxlint,
-categories and `recommended` only select built-in rules (a plugin rule's `docs.category` and
-`docs.recommended` are ignored), but `all` includes plugin rules. Inline directives and `--rules` cover them like
-built-in rules.
-
-A plugin is a default export with `rules`. A rule has `meta` and a `create(context)` function that
-returns functions for the mdast nodes to check:
-
-```js
-export default {
-  meta: { name: "eslint-plugin-team" }, // rules are named team/<rule>
-  rules: {
-    "no-todo": {
-      meta: {
-        docs: { description: "Disallow TODO notes" },
-        messages: { todo: "Resolve the {{ word }} before committing" },
-        schema: [{ type: "object", properties: { word: { type: "string" } }, additionalProperties: false }],
-        defaultOptions: [{ word: "TODO" }],
-      },
-      create(context) {
-        const [{ word }] = context.options;
-        return {
-          // A CSS-like selector, as in ESLint: text directly inside a heading or paragraph.
-          ":matches(heading, paragraph) > text"(node) {
-            if (node.value.includes(word)) context.report({ node, messageId: "todo", data: { word } });
-          },
-        };
-      },
-    },
-  },
-};
-```
-
-The package includes TypeScript types for plugins (types only, it has no JavaScript exports):
-`import type { Plugin, Rule } from "agentfile-linter"`, then `const rule: Rule<[Options]> = { ... }`.
-In JavaScript, use `/** @type {import("agentfile-linter").Plugin} */`.
-
-The API is ESLint's (for Markdown, so lines and columns start at 1):
-
-- `context`: `id`, `options` (merged over `meta.defaultOptions`), `settings`, `filename`,
-  `physicalFilename`, `cwd`, `sourceCode` and `report()`.
-- `context.sourceCode`: `text`, `ast`, `lines`, `getText()`, `getLoc()`, `getRange()`,
-  `getParent()`, `getAncestors()`, `getLocFromIndex()`, `getIndexFromLoc()` and
-  `lineStartIndices`.
-- `report()` takes `message` or `messageId` with `data`, and `node` or `loc`.
-- Visitor keys are node types or [esquery](https://github.com/estools/esquery) selectors, with
-  `:exit` for leaving a node. Oxlint's `createOnce` with `before` and `after` hooks works too,
-  so plugins wrapped in `eslintCompatPlugin` from `@oxlint/plugins` run as well.
-- `meta.schema` validates the options of a rule (keywords such as `$ref` or `format` are
-  ignored). As in ESLint, a rule without a schema takes no options.
-
-agentfile-linter adds a few extensions. ESLint and Oxlint ignore the first two, but rules that use
-the others only run in agentfile-linter:
-
-- `report({ help })`: a hint how to fix the problem, printed below it.
-- `meta.timeDependent`: the rule's problems depend on the current time, so directives for it are
-  never reported as unnecessary.
-- `context.project`: cached file system access to the file's project (its nearest Git root).
-- A visitor function, and the `after` hook of `createOnce`, can return a promise, which is awaited.
-- `collectTreeInputs()` and `checkTree()` instead of `create()`: rules that check the linted
-  directories as a whole, such as `agentfile/no-invalid-skill`.
-
-Not supported: fixes and suggestions (`fix` and `suggest` are accepted and ignored), processors,
-custom languages, defaults from schemas, and deprecated context methods such as
-`context.getSourceCode()` (use `context.sourceCode`). Like the built-in rules, plugin rules should be deterministic: their
-results should depend only on the linted files and the config.
+The npm package ships the guide at `node_modules/agentfile-linter/docs/plugin-api.md`, alongside the types for the installed version. Point your coding agent to that if they have trouble writing custom plugins.
 
 ## Rule details
 
@@ -345,8 +246,7 @@ Checks relative Markdown links, images, reference definitions and inline HTML li
 
 - `#anchor` must match a heading in the same file, using GitHub-style slugs. Duplicate headings get `-1`, `-2` suffixes. Explicit `id`/`name` anchors also count.
 - `other.md#anchor` must match a heading in the target Markdown file.
-- Line fragments (`src/app.ts#L42`, `#L42-L50`, `#L42-50`, `#L10C5-L12C20`) must point at lines
-  that exist in the target file. Line numbers start at 1, and a range must not end before it starts. GitHub renders Markdown files, so there `#L10` is checked as a heading anchor, unless the link opens the source view (`guide.md?plain=1#L10`, `?plain=1#L10` for the linted file). Directories, binary files, Git LFS pointers and git-ignored files (often generated) are not checked.
+- Line fragments (`src/app.ts#L42`, `#L42-L50`, `#L42-50`, `#L10C5-L12C20`) must point at lines that exist in the target file. Line numbers start at 1, and a range must not end before it starts. GitHub renders Markdown files, so there `#L10` is checked as a heading anchor, unless the link opens the source view (`guide.md?plain=1#L10`, `?plain=1#L10` for the linted file). Directories, binary files, Git LFS pointers and git-ignored files (often generated) are not checked.
 - Root-relative links (`/docs/x.md`) resolve against the project root, as on GitHub.
 - External URLs (`https:`, `mailto:`, `//cdn…`) and git-ignored targets are skipped.
 

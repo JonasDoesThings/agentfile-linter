@@ -8,6 +8,7 @@
   "files": [
     "dist/cli.js",
     "dist/types",
+    "docs/plugin-api.md",
     "configuration_schema.json"
   ],
   "type": "module",
@@ -21,7 +22,8 @@
     ".": {
       "types": "./dist/types/plugin-types.d.ts"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./docs/plugin-api.md": "./docs/plugin-api.md"
   },
   "scripts": {
     "dev": "bun run src/cli.ts",
