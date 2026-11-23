@@ -24,15 +24,6 @@ describe("helpers", () => {
 });
 
 describe("agentfile/no-agent-files-drift", () => {
-  test("identical files pass", async () => {
-    const root = makeProject({
-      "AGENTS.md": CONTENT,
-      "CLAUDE.md": CONTENT.replace(/\n/g, "\r\n"),
-      "GEMINI.md": CONTENT,
-    });
-    expect(await runRule(root, RULE)).toEqual([]);
-  });
-
   test("symlinked files pass (and are linted only once)", async () => {
     const root = makeProject({
       "AGENTS.md": `${CONTENT}\n\`missing.ts\`\n`,
@@ -47,7 +38,8 @@ describe("agentfile/no-agent-files-drift", () => {
     const root = makeProject({
       "AGENTS.md": CONTENT,
       "CLAUDE.md": CONTENT.replace("Run tests.", "Run all tests."),
-      "GEMINI.md": CONTENT,
+      // Differences in line endings don't count as drift.
+      "GEMINI.md": CONTENT.replace(/\n/g, "\r\n"),
     });
     const diagnostics = await runRule(root, RULE);
     expect(diagnostics.map((d) => [d.file, d.line, d.message])).toEqual([

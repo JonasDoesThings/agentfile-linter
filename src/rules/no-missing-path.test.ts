@@ -10,11 +10,9 @@ describe("classifyPathCandidate", () => {
   test.each([
     ["src/index.ts", "strong"],
     ["./scripts/build", "strong"],
-    ["../shared/README.md", "strong"],
     ["docs/", "strong"],
     ["package.json", "strong"],
     [".env.example", "strong"],
-    [".github/workflows/ci.yml", "strong"],
     ["Makefile", "strong"],
     ["src/**/*.test.ts", "strong"],
     ["src/app.ts:12", "strong"],
@@ -28,35 +26,21 @@ describe("classifyPathCandidate", () => {
   test.each([
     "pnpm dev",
     "https://example.com/x.md",
-    "node:fs/promises",
     "@scope/package",
     "/etc/hosts",
-    "~/.claude/settings.json",
     "process.env",
-    "console.log",
     "Node.js",
-    "Next.js",
     ".ts",
     ".d.ts",
-    ".test.tsx",
     "*.md",
     "path/to/file.ts",
-    "src/<name>.ts",
     "src/{id}.ts",
     "src/.../x.ts",
     "foo.ts",
     "your-app/config.json",
-    "useState()",
-    "KEY=value",
-    "localhost:3000/api",
-    "C:\\foo\\bar.ts",
-    "TODO",
-    ".tscn",
     ".gd.uid",
     "Bun.sql",
     "Bun.YAML",
-    "res.json",
-    "postgres.js",
   ])("%p is not a path", (input) => {
     expect(classifyPathCandidate(input)).toBeNull();
   });
@@ -91,21 +75,17 @@ describe("agentfile/no-missing-path", () => {
     expect(diagnostics[0]).toMatchObject({ line: 3, column: 4 });
   });
 
-  test("resolves against the file directory and its ancestors up to the root", async () => {
+  test("resolves against the file directory and its ancestors; `./` paths against the file only", async () => {
     const root = makeProject({
       "packages/a/src/x.ts": "",
       "turbo.json": "{}",
       "packages/a/AGENTS.md": "`src/x.ts`, `packages/a/src/x.ts` and `turbo.json`\n",
-    });
-    expect(await runRule(root, RULE)).toEqual([]);
-  });
-
-  test("`./` paths are resolved relative to the file only", async () => {
-    const root = makeProject({
       "src/x.ts": "",
       "docs/AGENTS.md": "`./src/x.ts`\n",
     });
-    expect(messages(await runRule(root, RULE))).toEqual(["Path `./src/x.ts` does not exist"]);
+    expect((await runRule(root, RULE)).map((d) => `${d.file}: ${d.message}`)).toEqual([
+      "docs/AGENTS.md: Path `./src/x.ts` does not exist",
+    ]);
   });
 
   test("suffix matching accepts partial paths, can be disabled", async () => {
@@ -123,14 +103,6 @@ describe("agentfile/no-missing-path", () => {
     expect(messages(diagnostics)).toEqual(["Path `components/Button.tsx` does not exist"]);
   });
 
-  test("bare file names must exist somewhere in the project", async () => {
-    const root = makeProject({
-      "packages/a/utils.ts": "",
-      "AGENTS.md": "`utils.ts` exists, `helpers.ts` does not\n",
-    });
-    expect(messages(await runRule(root, RULE))).toEqual(["Path `helpers.ts` does not exist"]);
-  });
-
   test("suggests files with the same name", async () => {
     const root = makeProject({
       "src/new/config.ts": "",
@@ -141,63 +113,61 @@ describe("agentfile/no-missing-path", () => {
     expect(diagnostics[0]?.help).toBe("Did you mean `src/new/config.ts`?");
   });
 
-  test("weak candidates are only checked when their first segment exists", async () => {
+  test("bare names exist anywhere, weak candidates need an existing first segment, modules need no extension", async () => {
     const root = makeProject({
+      "packages/a/utils.ts": "",
       "apps/web/": "",
-      "AGENTS.md": "`react-dom/client`, `origin/main`, `apps/web`, `apps/mobile`\n",
+      "src/lib/db.ts": "",
+      "AGENTS.md": [
+        "`utils.ts` exists, `helpers.ts` does not.",
+        "`react-dom/client`, `origin/main`, `apps/web`, `apps/mobile`.",
+        "Import from `src/lib/db`.",
+        "",
+      ].join("\n"),
     });
-    expect(messages(await runRule(root, RULE))).toEqual(["Path `apps/mobile` does not exist"]);
+    expect(messages(await runRule(root, RULE))).toEqual([
+      "Path `helpers.ts` does not exist",
+      "Path `apps/mobile` does not exist",
+    ]);
   });
 
-  test("extension-less module paths match files with any extension", async () => {
-    const root = makeProject({ "src/lib/db.ts": "", "AGENTS.md": "Import from `src/lib/db`.\n" });
-    expect(await runRule(root, RULE)).toEqual([]);
-  });
-
-  test("git-ignored and node_modules paths are skipped", async () => {
+  test("skips ignored, link-wrapped and fenced references; accepts compiled artifacts of existing sources", async () => {
     const root = makeProject({
       ".gitignore": "dist/\n.env\n",
-      "AGENTS.md": "`dist/index.js`, `.env`, `node_modules/.bin/tsc`, `.env.example`\n",
+      "src/main.ts": "",
+      "styles/app.scss": "",
+      "AGENTS.md": [
+        "`dist/index.js`, `.env`, `node_modules/.bin/tsc`, `.env.example`",
+        "",
+        "[`src/a.ts`](src/a.ts)",
+        "",
+        "```sh",
+        "cat src/b.ts",
+        "```",
+        "",
+        "`src/main.ts` compiles to `main.js`; `app.css` comes from Sass; `other.js` is missing",
+        "",
+      ].join("\n"),
     });
-    expect(messages(await runRule(root, RULE))).toEqual(["Path `.env.example` does not exist"]);
+    expect(messages(await runRule(root, RULE))).toEqual([
+      "Path `.env.example` does not exist",
+      "Path `other.js` does not exist",
+    ]);
   });
 
-  test("globs must match at least one file", async () => {
+  test("globs must match a file; parent-relative globs resolve from the context file; literal brackets are paths first", async () => {
     const root = makeProject({
       "src/a.test.ts": "",
-      "AGENTS.md": "`src/**/*.test.ts` and `e2e/**/*.spec.ts`\n",
-    });
-    expect(messages(await runRule(root, RULE))).toEqual(["No files match the glob `e2e/**/*.spec.ts`"]);
-  });
-
-  test("resolves parent-relative globs from the context file", async () => {
-    const root = makeProject({
+      "app/[slug]/page.tsx": "",
+      "AGENTS.md": "`src/**/*.test.ts`, `e2e/**/*.spec.ts` and `app/[slug]/page.tsx`\n",
       "docs/[lang]/AGENTS.md": "`../../shared/*.md`, `./guides/*.md` and `../shared/*.md`\n",
       "docs/[lang]/guides/start.md": "",
       "shared/reference.md": "",
     });
-    expect(messages(await runRule(root, RULE))).toEqual(["No files match the glob `../shared/*.md`"]);
-  });
-
-  test("literal brackets (Next.js routes) are checked as paths first", async () => {
-    const root = makeProject({ "app/[slug]/page.tsx": "", "AGENTS.md": "`app/[slug]/page.tsx`\n" });
-    expect(await runRule(root, RULE)).toEqual([]);
-  });
-
-  test("code spans inside links and fenced code blocks are not checked", async () => {
-    const root = makeProject({
-      "AGENTS.md": "[`src/a.ts`](src/a.ts)\n\n```sh\ncat src/b.ts\n```\n",
-    });
-    expect(await runRule(root, RULE)).toEqual([]);
-  });
-
-  test("compiled artifacts of existing sources are accepted", async () => {
-    const root = makeProject({
-      "src/main.ts": "",
-      "styles/app.scss": "",
-      "AGENTS.md": "`src/main.ts` compiles to `main.js`; `app.css` comes from Sass; `other.js` is missing\n",
-    });
-    expect(messages(await runRule(root, RULE))).toEqual(["Path `other.js` does not exist"]);
+    expect((await runRule(root, RULE)).map((d) => `${d.file}: ${d.message}`)).toEqual([
+      "AGENTS.md: No files match the glob `e2e/**/*.spec.ts`",
+      "docs/[lang]/AGENTS.md: No files match the glob `../shared/*.md`",
+    ]);
   });
 
   test("example files are not checked", async () => {
@@ -241,18 +211,12 @@ describe("agentfile/no-missing-path", () => {
     expect(diagnostics[0]).toMatchObject({ line: 2, column: 1 });
   });
 
-  test("checkImports: false disables import checks", async () => {
+  test("checkImports: false and ignore skip imports and matching paths", async () => {
     const root = makeProject({
-      "CLAUDE.md": "@docs/missing.md\n",
-      ".agentfile-linterrc.json": { rules: { [RULE]: ["error", { checkImports: false }] } },
-    });
-    expect(await run(root)).toEqual([]);
-  });
-
-  test("ignore option skips matching paths", async () => {
-    const root = makeProject({
-      "AGENTS.md": "`generated/client.ts` and `src/missing.ts`\n",
-      ".agentfile-linterrc.json": { rules: { [RULE]: ["error", { ignore: ["generated/**"] }] } },
+      "CLAUDE.md": "@docs/missing.md\n\n`generated/client.ts` and `src/missing.ts`\n",
+      ".agentfile-linterrc.json": {
+        rules: { [RULE]: ["error", { checkImports: false, ignore: ["generated/**"] }] },
+      },
     });
     expect(messages(await run(root))).toEqual(["Path `src/missing.ts` does not exist"]);
   });

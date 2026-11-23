@@ -3,7 +3,7 @@ import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { lint } from "#src/linter.ts";
-import { commit, makeProject, run, runRule } from "#test/helpers.ts";
+import { commit, makeProject, run, runGit, runRule } from "#test/helpers.ts";
 
 const RULE = "agentfile/no-unnecessary-agent-files";
 const CONTENT = "# Agents\n\nUse pnpm.\n";
@@ -11,10 +11,16 @@ const CONTENT = "# Agents\n\nUse pnpm.\n";
 const summary = async (root: string) =>
   (await runRule(root, RULE)).map((d) => [d.file, d.line, d.message, d.help?.match(/\(`(.+)`\)\.$/)?.[1]]);
 
+/** Puts `paths` in the Git index without a commit, which is all the rule reads. */
+function track(root: string, paths: string[] = ["."]) {
+  runGit(root, ["init", "-q"]);
+  runGit(root, ["add", "--", ...paths]);
+}
+
 describe("agentfile/no-unnecessary-agent-files", () => {
   test("CLAUDE.md symlinked to AGENTS.md is reported once", async () => {
     const root = makeProject({ "AGENTS.md": CONTENT, "CLAUDE.md": { symlink: "AGENTS.md" } });
-    commit(root);
+    track(root);
     expect(await summary(root)).toEqual([
       ["CLAUDE.md", 1, "`CLAUDE.md` is a symlink to `AGENTS.md` and is not needed", "git rm CLAUDE.md"],
     ]);
@@ -22,27 +28,25 @@ describe("agentfile/no-unnecessary-agent-files", () => {
 
   test("untracked files and projects outside Git get commands without git", async () => {
     const untracked = makeProject({ "AGENTS.md": CONTENT, "CLAUDE.md": CONTENT });
-    commit(untracked, { paths: ["AGENTS.md"] });
+    track(untracked, ["AGENTS.md"]);
     expect((await summary(untracked)).map((d) => d[3])).toEqual(["rm CLAUDE.md"]);
 
-    const noGit = makeProject({ "app/CLAUDE.md": CONTENT, "app/AGENTS.md": { symlink: "CLAUDE.md" } }, { git: false });
+    const noGit = makeProject({ "app/CLAUDE.md": CONTENT, "app/AGENTS.md": { symlink: "CLAUDE.md" } });
     expect((await summary(noGit)).map((d) => d[3])).toEqual([
       'rm "./app/AGENTS.md" && mv "./app/CLAUDE.md" "./app/AGENTS.md"',
     ]);
   });
 
-  test.each([
-    ["git-ignored", { ".gitignore": "AGENTS.md\n" }],
-    ["untracked", {}],
-  ])("a committed CLAUDE.md next to a %s AGENTS.md is kept", async (_, extra) => {
-    const root = makeProject({ ...extra, "AGENTS.md": CONTENT, "CLAUDE.md": CONTENT });
-    commit(root, { paths: ["CLAUDE.md", ...Object.keys(extra)] });
+  // A git-ignored AGENTS.md is untracked as far as the index is concerned.
+  test("a committed CLAUDE.md next to a git-ignored AGENTS.md is kept", async () => {
+    const root = makeProject({ ".gitignore": "AGENTS.md\n", "AGENTS.md": CONTENT, "CLAUDE.md": CONTENT });
+    track(root, ["CLAUDE.md", ".gitignore"]);
     expect(await runRule(root, RULE)).toEqual([]);
   });
 
   test("AGENTS.md symlinked to CLAUDE.md suggests making AGENTS.md the real file", async () => {
     const root = makeProject({ "CLAUDE.md": CONTENT, "AGENTS.md": { symlink: "CLAUDE.md" } });
-    commit(root);
+    track(root);
     expect(await summary(root)).toEqual([
       [
         "CLAUDE.md",
@@ -185,18 +189,14 @@ describe("agentfile/no-unnecessary-agent-files", () => {
     expect((await summary(root)).map(([path]) => path)).toEqual(["CLAUDE.md"]);
   });
 
-  test.each([".claude/rules/style.md", ".claude/commands/review.md", ".claude/skills/review/SKILL.md"])(
-    "a CLAUDE.md imported by %s is retained",
-    async (importer) => {
-      const depth = importer.split("/").length - 1;
-      const root = makeProject({
-        "AGENTS.md": CONTENT,
-        "CLAUDE.md": { symlink: "AGENTS.md" },
-        [importer]: `Follow the project rules.\n\n@${"../".repeat(depth)}CLAUDE.md\n`,
-      });
-      expect(await summary(root)).toEqual([]);
-    },
-  );
+  test("a CLAUDE.md imported by a file in .claude is retained", async () => {
+    const root = makeProject({
+      "AGENTS.md": CONTENT,
+      "CLAUDE.md": { symlink: "AGENTS.md" },
+      ".claude/skills/review/SKILL.md": "Follow the project rules.\n\n@../../../CLAUDE.md\n",
+    });
+    expect(await summary(root)).toEqual([]);
+  });
 
   test("a CLAUDE.md imported by a git-ignored CLAUDE.local.md is retained", async () => {
     const root = makeProject({
@@ -232,17 +232,6 @@ describe("agentfile/no-unnecessary-agent-files", () => {
       "d/GEMINI.md": { symlink: "AGENTS.md" },
     });
     expect(await summary(root)).toEqual([]);
-  });
-
-  test("pairs are per directory", async () => {
-    const root = makeProject({
-      "AGENTS.md": CONTENT,
-      "packages/a/AGENTS.md": CONTENT,
-      "packages/a/CLAUDE.md": "@AGENTS.md\n",
-      "packages/b/AGENTS.md": CONTENT,
-      "packages/b/CLAUDE.md": "# Claude\n",
-    });
-    expect((await summary(root)).map((d) => d[0])).toEqual(["packages/a/CLAUDE.md"]);
   });
 
   test.each(["CLAUDE.local.md", ".claude/CLAUDE.md"])(

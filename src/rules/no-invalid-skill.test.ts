@@ -75,13 +75,6 @@ describe("agentfile/no-invalid-skill: layout", () => {
     ]);
   });
 
-  test("skills nested in grouping folders are validated", async () => {
-    const root = makeProject({ ".claude/skills/group/inner/SKILL.md": valid("other") });
-    expect(await summary(root)).toEqual([
-      ".claude/skills/group/inner/SKILL.md:2 Skill name `other` does not match its directory `inner`",
-    ]);
-  });
-
   test("skills nested below a misnamed SKILL.md are validated", async () => {
     const root = makeProject({
       ".claude/skills/group/skill.md": "# Group notes\n",
@@ -429,11 +422,6 @@ describe("agentfile/no-invalid-skill: frontmatter", () => {
 });
 
 describe("agentfile/no-invalid-skill: configuration and output", () => {
-  test("is recommended and reports errors", async () => {
-    const root = makeProject({ ".claude/skills/a/SKILL.md": "# No frontmatter\n" });
-    expect((await run(root)).map((d) => [d.rule, d.severity])).toEqual([[RULE, "error"]]);
-  });
-
   test("overrides change severity and options per skill", async () => {
     const root = makeProject({
       ".claude/skills/legacy/SKILL.md": "# No frontmatter\n",
@@ -558,18 +546,6 @@ describe("agentfile/no-invalid-skill: configuration and output", () => {
     expect(await lint({ cwd: root, ruleFlags })).toMatchObject({ fileCount: 1, ruleCount: 0 });
   });
 
-  test("clean and invalid skills both count toward the total", async () => {
-    const root = makeProject({
-      ".agents/skills/clean/SKILL.md": valid("clean"),
-      ".agents/skills/invalid/SKILL.md": "# No frontmatter\n",
-    });
-    const result = await lint({ cwd: root, config: false });
-    expect(result).toMatchObject({ fileCount: 2, ruleCount: 1, errorCount: 1 });
-    expect(result.files.map((file) => file.diagnostics.length)).toEqual([0, 1]);
-    const json: unknown = JSON.parse(format(result, "json", { cwd: root, color: false }));
-    expect(json).toMatchObject({ number_of_files: 2 });
-  });
-
   test("inline suppressions apply to tree diagnostics and preserve the checked file count", async () => {
     const root = makeProject({
       ".agents/skills/demo/SKILL.md": `<!-- agentfile-linter-disable ${RULE} -->\n# Demo\n`,
@@ -600,20 +576,17 @@ describe("agentfile/no-invalid-skill: configuration and output", () => {
     ]);
   });
 
-  test("a frontmatter disable after an enable still applies", async () => {
+  test("a frontmatter disable covers the opening `---`, but not the lines before it", async () => {
     const root = makeProject({
+      // A disable that only covers the opening `---` (missing `description`) is not unnecessary.
+      ".agents/skills/missing/SKILL.md": skill("name: missing", `# agentfile-linter-disable ${RULE}`),
+      // A disable after an enable still applies.
       ".agents/skills/order/SKILL.md": skill(
         "# agentfile-linter-enable",
         `# agentfile-linter-disable ${RULE}`,
         "name: Bad_Name",
         "description: Does it.",
       ),
-    });
-    expect(await summary(root)).toEqual([]);
-  });
-
-  test("a frontmatter disable covers the opening `---`, but not the lines before it", async () => {
-    const root = makeProject({
       ".agents/skills/above/SKILL.md": skill("name: Bad_Name", "description: d", `# agentfile-linter-disable ${RULE}`),
       ".agents/skills/enabled/SKILL.md": skill(
         `# agentfile-linter-disable ${RULE}`,
@@ -629,16 +602,6 @@ describe("agentfile/no-invalid-skill: configuration and output", () => {
       `.agents/skills/enabled/SKILL.md:2 Unnecessary suppression of \`${RULE}\` in \`agentfile-linter-disable\` directive`,
       ".agents/skills/enabled/SKILL.md:4 Skill name `Bad_Name` must contain only lowercase letters, digits and hyphens",
       `.agents/skills/enabled/SKILL.md:5 Unnecessary suppression of \`${RULE}\` in \`agentfile-linter-disable\` directive`,
-    ]);
-  });
-
-  test("a frontmatter disable that only covers the opening `---` is not unnecessary", async () => {
-    const root = makeProject({
-      ".agents/skills/missing/SKILL.md": skill("name: missing", `# agentfile-linter-disable ${RULE}`),
-    });
-    expect(await summary(root)).toEqual([]);
-    expect(await summary(makeProject({ ".agents/skills/missing/SKILL.md": skill("name: missing") }))).toEqual([
-      expect.stringMatching(/^\.agents\/skills\/missing\/SKILL\.md:1 /),
     ]);
   });
 

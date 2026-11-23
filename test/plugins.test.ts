@@ -95,28 +95,6 @@ export default {
 `;
 
 describe("ESLint plugins", () => {
-  test("runs markdown/no-empty-links from @eslint/markdown unchanged", async () => {
-    const root = withPackages({
-      ".agentfile-linterrc.json": {
-        jsPlugins: [MARKDOWN],
-        categories: { recommended: "off" },
-        rules: { "markdown/no-empty-links": "error" },
-      },
-      "AGENTS.md": "# Title\n\nSee [nothing]() and [hash](#) and [ok](#title).\n",
-    });
-    const diagnostic = {
-      file: "AGENTS.md",
-      rule: "markdown/no-empty-links",
-      line: 3,
-      help: undefined,
-      severity: "error",
-    };
-    expect(await run(root)).toEqual([
-      { ...diagnostic, column: 5, message: "Unexpected empty link found." },
-      { ...diagnostic, column: 21, message: "Unexpected empty link found." },
-    ]);
-  });
-
   test("every @eslint/markdown rule reports what ESLint reports", async () => {
     // A document that each rule has something to report in; the expected results are ESLint 9's.
     const root = withPackages({

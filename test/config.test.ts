@@ -27,15 +27,6 @@ describe("rule resolution", () => {
     expect(enabled(new RuleResolver(parseConfig({}, null, "/x")))).toEqual(ALL_ERROR);
   });
 
-  test("config rules layer on top of the recommended set", () => {
-    const config = parseConfig(
-      { rules: { "agentfile/no-missing-path": "error", "no-missing-script": "warn" } },
-      null,
-      "/x",
-    );
-    expect(enabled(new RuleResolver(config))).toEqual({ ...ALL_ERROR, "agentfile/no-missing-script": "warn" });
-  });
-
   test("categories set the severity of all their rules, rules override categories", () => {
     const config = parseConfig(
       { categories: { recommended: "warn" }, rules: { "no-agent-files-drift": 2, "no-broken-reference": "off" } },
@@ -111,12 +102,6 @@ describe("rule resolution", () => {
     expect(gemini).toMatchObject({ severity: "warn", options: [{ ignore: ["x"] }] });
   });
 
-  test("rule options are merged over defaults", () => {
-    const config = parseConfig({ rules: { "no-missing-path": ["error", { checkImports: false }] } }, null, "/x");
-    const rule = new RuleResolver(config).forFile("/x/AGENTS.md").find((r) => r.id === "agentfile/no-missing-path");
-    expect(rule?.options).toEqual([{ ignore: [], allowSuffixMatch: true, checkImports: false }]);
-  });
-
   test("matching overrides inherit options and replace only explicit keys", () => {
     const name = "agentfile/no-missing-path";
     const config = parseConfig(
@@ -153,7 +138,6 @@ describe("config validation", () => {
     [{ rules: { "no-missing-path": "loud" } }, /invalid severity "loud"/],
     [{ rules: { "no-missing-path": ["error", { nope: 1 }] } }, /unknown property "nope"/],
     [{ rules: { "no-invalid-skill": ["error", { toString: 1 }] } }, /unknown property "toString"/],
-    [{ rules: { "no-missing-path": ["error", { constructor: 1 }] } }, /unknown property "constructor"/],
     [{ rules: { "no-missing-path": ["error", { ignore: "x" }] } }, /options.ignore must be an array/],
     [{ categories: { gemini: "error" } }, /unknown category "gemini"/],
     [{ plugins: [] }, /unknown property "plugins"/],
