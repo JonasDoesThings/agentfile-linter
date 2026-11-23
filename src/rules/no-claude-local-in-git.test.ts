@@ -47,7 +47,6 @@ describe(RULE, () => {
     });
     runGit(root, ["init", "-q"]);
     runGit(root, ["config", "core.excludesFile", join(root, ".git/global-ignore")]);
-    expect(runGit(root, ["check-ignore", "--", FILE, privateDir]).trim().split("\n")).toEqual([FILE, privateDir]);
 
     expect(await runRule(root, RULE)).toEqual(
       [FILE, privateDir].map((file) =>

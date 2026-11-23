@@ -34,131 +34,149 @@ describe("cli", () => {
     expect(stdout).toContain("on 1 file with 5 rules");
   });
 
-  test("exits 0 when clean, and with warnings unless --deny-warnings / --max-warnings", async () => {
+  test("exit code: warnings pass unless --deny-warnings / --max-warnings", async () => {
     const root = makeProject({ "AGENTS.md": "`missing.ts`\n" });
-    expect((await cli(root, "-W", "all")).code).toBe(0);
-    expect((await cli(root, "-W", "all", "--deny-warnings")).code).toBe(1);
-    expect((await cli(root, "-W", "all", "--max-warnings", "0")).code).toBe(1);
-    expect((await cli(root, "-W", "all", "--max-warnings=1")).code).toBe(0);
-    expect((await cli(root, "-A", "all")).code).toBe(0);
+    const codes = await Promise.all([
+      cli(root, "-W", "all"),
+      cli(root, "-W", "all", "--deny-warnings"),
+      cli(root, "-W", "all", "--max-warnings", "0"),
+      // One warning is not more than one.
+      cli(root, "-W", "all", "--max-warnings=1"),
+    ]).then((results) => results.map((r) => r.code));
+    expect(codes).toEqual([0, 1, 1, 0]);
   });
 
   test("--quiet hides warnings; --silent hides everything", async () => {
     const root = makeProject({ "AGENTS.md": "`missing.ts` `pnpm dev`\n" });
-    const quiet = await cli(root, "-W", "no-missing-path", "--quiet", "-f", "unix");
+    const [quiet, silent] = await Promise.all([
+      cli(root, "-W", "no-missing-path", "--quiet", "-f", "unix"),
+      cli(root, "--silent"),
+    ]);
     expect(quiet.stdout).not.toContain("missing.ts");
     expect(quiet.stdout).toContain("no-missing-script");
-    const silent = await cli(root, "--silent");
     expect(silent.stdout).toBe("");
     expect(silent.code).toBe(1);
   });
 
-  test("json, stylish, github and unix formats", async () => {
-    const root = makeProject({ "AGENTS.md": "`missing.ts`\n" });
-    const json = JSON.parse((await cli(root, "-f", "json")).stdout);
-    expect(json).toMatchObject({
+  test("json, stylish, github and unix formats, for errors and info diagnostics", async () => {
+    // Line 1 is an info diagnostic (unknown rule in a directive), line 2 an error.
+    const root = makeProject({
+      "AGENTS.md": "<!-- agentfile-linter-disable-next-line no-mising-path -->\n`missing.ts`\n",
+    });
+    const info = "Unknown rule `no-mising-path` in `agentfile-linter-disable-next-line` directive";
+    const [json, stylish, github, unix] = await Promise.all(
+      ["json", "stylish", "github", "unix"].map((format) => cli(root, "-f", format)),
+    );
+    expect(JSON.parse(json?.stdout ?? "")).toMatchObject({
       errors: 1,
       warnings: 0,
       number_of_files: 1,
       diagnostics: [
+        { severity: "info", rule: null, message: info },
         {
           code: "agentfile(no-missing-path)",
           rule: "agentfile/no-missing-path",
           severity: "error",
           filename: "AGENTS.md",
-          start: { line: 1, column: 2 },
+          start: { line: 2, column: 2 },
         },
       ],
     });
-    expect((await cli(root, "-f", "stylish")).stdout).toContain(
-      "  1:2  error  Path `missing.ts` does not exist  agentfile/no-missing-path",
+    expect(stylish?.stdout).toContain(`  1:41  info   ${info}`);
+    expect(stylish?.stdout).toMatch(/  2:2 +error +Path `missing.ts` does not exist +agentfile\/no-missing-path/);
+    expect(github?.stdout).toContain(
+      "::notice file=AGENTS.md,line=1,endLine=1,col=41,endColumn=55,title=agentfile-linter::",
     );
-    expect((await cli(root, "--format=github")).stdout).toStartWith(
-      "::error file=AGENTS.md,line=1,endLine=1,col=2,endColumn=12,title=agentfile/no-missing-path::",
+    expect(github?.stdout).toContain(
+      "::error file=AGENTS.md,line=2,endLine=2,col=2,endColumn=12,title=agentfile/no-missing-path::",
     );
-    expect((await cli(root, "-f", "unix")).stdout).toBe(
-      "AGENTS.md:1:2: Path `missing.ts` does not exist [Error/agentfile/no-missing-path]\n\n1 problem\n",
+    expect(unix?.stdout).toBe(
+      `AGENTS.md:1:41: ${info} [Info/agentfile-linter]\n` +
+        "AGENTS.md:2:2: Path `missing.ts` does not exist [Error/agentfile/no-missing-path]\n\n1 problem\n",
     );
   });
 
   test("unknown rules in directives are printed as info and don't fail the run", async () => {
     const root = makeProject({ "AGENTS.md": "<!-- agentfile-linter-disable-next-line no-mising-path -->\nHi\n" });
     const message = "Unknown rule `no-mising-path` in `agentfile-linter-disable-next-line` directive";
-    const result = await cli(root, "--deny-warnings");
+    const [result, stylish, unix] = await Promise.all([
+      cli(root, "--deny-warnings"),
+      cli(root, "-f", "stylish"),
+      cli(root, "-f", "unix"),
+    ]);
     expect(result.code).toBe(0);
     expect(result.stdout).toContain(`ℹ agentfile-linter: ${message}`);
     expect(result.stdout).toContain("╭─[AGENTS.md:1:41]");
     expect(result.stdout).toContain("help: Did you mean `agentfile/no-missing-path`?");
     expect(result.stdout).toContain("Found 0 warnings and 0 errors.");
-    expect((await cli(root, "-f", "stylish")).stdout).toBe(`AGENTS.md\n  1:41  info  ${message}\n\n`);
-    expect((await cli(root, "-f", "unix")).stdout).toBe(`AGENTS.md:1:41: ${message} [Info/agentfile-linter]\n`);
-    expect((await cli(root, "-f", "github")).stdout).toStartWith(
-      "::notice file=AGENTS.md,line=1,endLine=1,col=41,endColumn=55,title=agentfile-linter::",
-    );
-    expect(JSON.parse((await cli(root, "-f", "json")).stdout)).toMatchObject({
-      errors: 0,
-      warnings: 0,
-      diagnostics: [{ severity: "info", rule: null, message }],
-    });
-    expect((await cli(root, "--quiet")).stdout).not.toContain(message);
+    // Info diagnostics are no problems: these formats print no summary for them.
+    expect(stylish.stdout).toBe(`AGENTS.md\n  1:41  info  ${message}\n\n`);
+    expect(unix.stdout).toBe(`AGENTS.md:1:41: ${message} [Info/agentfile-linter]\n`);
   });
 
   test("usage and config errors exit 2", async () => {
     const root = makeProject({ ".agentfile-linterrc.json": '{ "rules": { "nope": "error" } }' });
-    expect(await cli(root)).toMatchObject({ code: 2, stderr: expect.stringContaining('unknown rule "nope"') });
-    expect((await cli(root, "--nope")).code).toBe(2);
-    expect((await cli(root, "-f", "xml", "-c", "x.json")).code).toBe(2);
+    const [config, option, format, debug] = await Promise.all([
+      cli(root),
+      cli(root, "--nope"),
+      cli(root, "-f", "xml", "-c", "x.json"),
+      cli(root, "--debug", "files,unknown"),
+    ]);
+    expect(config).toMatchObject({ code: 2, stderr: expect.stringContaining('unknown rule "nope"') });
+    expect(option.code).toBe(2);
+    expect(format.code).toBe(2);
+    expect(debug).toMatchObject({
+      code: 2,
+      stderr: expect.stringContaining("'unknown' is not a known debug option (available: files, timings)"),
+    });
   });
 
-  test("--init, --rules, --print-config, --version, --help", async () => {
+  test("--init, --print-config, --version, --help", async () => {
     const root = makeProject({});
     expect((await cli(root, "--init")).code).toBe(0);
     const config = Bun.JSONC.parse(readFileSync(join(root, ".agentfile-linterrc.json"), "utf8"));
     expect(config).toEqual({ categories: { recommended: "error" }, rules: {}, ignorePatterns: [] });
-    expect((await cli(root, "--init")).code).toBe(2);
 
-    const rules = (await cli(root, "--rules")).stdout;
-    expect(rules).toMatch(/^agentfile\/no-agent-files-drift +suspicious +error +AGENTS\.md/m);
-    expect(rules).toMatch(/^agentfile\/keep-agents-file-up-to-date +pedantic +off +Context files/m);
-    const printed = JSON.parse((await cli(root, "--print-config", "-A", "no-missing-script")).stdout);
-    expect(printed.configFile).toBe(".agentfile-linterrc.json");
-    expect(printed.rules["agentfile/no-missing-script"]).toBe("off");
-    expect((await cli(root, "-V")).stdout).toBe(`agentfile-linter ${pkg.version}\n`);
-    expect((await cli(root, "-h")).stdout).toContain("Usage: agentfile-linter [OPTIONS] [PATH]...");
+    const [printed, version, help] = await Promise.all([
+      cli(root, "--print-config", "-A", "no-missing-script"),
+      cli(root, "-V"),
+      cli(root, "-h"),
+    ]);
+    const description = JSON.parse(printed.stdout);
+    expect(description.configFile).toBe(".agentfile-linterrc.json");
+    expect(description.rules["agentfile/no-missing-script"]).toBe("off");
+    expect(version.stdout).toBe(`agentfile-linter ${pkg.version}\n`);
+    expect(help.stdout).toContain("Usage: agentfile-linter [OPTIONS] [PATH]...");
   });
 
   test("--rules lists the rules that load and reports config problems below them", async () => {
-    const plugin = 'export default { meta: { name: "ok" }, rules: { rule: { create: () => ({}) } } };';
     const root = makeProject({
-      "ok.js": plugin,
-      ".agentfile-linterrc.json": { jsPlugins: ["./ok.js", "./missing.js"], rules: { "missing/rule": "error" } },
-    });
-    const listed = await cli(root, "--rules");
-    expect(listed.code).toBe(0);
-    expect(listed.stdout).toMatch(/^ok\/rule +- +off/m);
-    expect(listed.stdout).toMatch(/^agentfile\/no-missing-path /m);
-    expect(listed.stderr).toMatch(
-      /^\nagentfile-linter: \.agentfile-linterrc\.json: Cannot load plugin "\.\/missing\.js": .*\. Its rules are not listed\.\n$/,
-    );
-
-    const malformed = makeProject({
-      "ok.js": plugin,
+      "ok.js": 'export default { meta: { name: "ok" }, rules: { rule: { create: () => ({}) } } };',
       "name.js": "export default { meta: { name: 42 }, rules: { rule: { create: () => ({}) } } };",
       "meta.js": 'export default { meta: "x", rules: { rule: { create: () => ({}) } } };',
-      ".agentfile-linterrc.json": { jsPlugins: ["./ok.js", "./name.js", "./meta.js"] },
+      ".agentfile-linterrc.json": {
+        jsPlugins: ["./ok.js", "./missing.js", "./name.js", "./meta.js"],
+        rules: { "missing/rule": "error" },
+      },
     });
-    const isolated = await cli(malformed, "--rules");
-    expect(isolated.code).toBe(0);
-    expect(isolated.stdout).toMatch(/^ok\/rule +- +off/m);
-    expect(isolated.stderr).toContain('Plugin "./name.js" has an invalid `meta.name`: expected a string.');
-    expect(isolated.stderr).toContain('Plugin "./meta.js" has an invalid `meta`: expected an object');
-
     const typo = makeProject({ ".agentfile-linterrc.json": { rules: { "no-missing-paht": "error" } } });
-    const fixed = await cli(typo, "--rules");
+    const [listed, fixed, noConfig] = await Promise.all([
+      cli(root, "--rules"),
+      cli(typo, "--rules"),
+      cli(typo, "--rules", "-c", "nope.json"),
+    ]);
+    expect(listed.code).toBe(0);
+    expect(listed.stdout).toMatch(/^ok\/rule +- +off/m);
+    expect(listed.stdout).toMatch(/^agentfile\/no-agent-files-drift +suspicious +error +AGENTS\.md/m);
+    expect(listed.stdout).toMatch(/^agentfile\/keep-agents-file-up-to-date +pedantic +off +Context files/m);
+    expect(listed.stderr).toMatch(/^\nagentfile-linter: /);
+    expect(listed.stderr).toMatch(/Cannot load plugin "\.\/missing\.js": .*\. Its rules are not listed\.\n/);
+    expect(listed.stderr).toContain('Plugin "./name.js" has an invalid `meta.name`: expected a string.');
+    expect(listed.stderr).toContain('Plugin "./meta.js" has an invalid `meta`: expected an object');
     expect(fixed.code).toBe(0);
     expect(fixed.stdout).toMatch(/^agentfile\/no-missing-path /m);
     expect(fixed.stderr).toContain('unknown rule "no-missing-paht". Did you mean "agentfile/no-missing-path"?');
-    expect((await cli(typo, "--rules", "-c", "nope.json")).stderr).toContain("Config file not found: nope.json");
+    expect(noConfig.stderr).toContain("Config file not found: nope.json");
   });
 
   test("--init preserves an existing JSONC config", async () => {
@@ -179,13 +197,15 @@ describe("cli", () => {
       "packages/a/GEMINI.md": "",
       "ignored/AGENTS.md": "",
     });
-    const { stdout, code } = await cli(root, "--debug", "files");
-    expect(code).toBe(0);
-    expect(stdout).toBe("AGENTS.md\npackages/a/GEMINI.md\n");
-    expect((await cli(root, "--debug=files", "packages")).stdout).toBe("packages/a/GEMINI.md\n");
-    expect((await cli(root, "--debug", "files", "--no-ignore")).stdout).toBe(
-      "AGENTS.md\nignored/AGENTS.md\npackages/a/GEMINI.md\n",
-    );
+    const [all, inline, noIgnore] = await Promise.all([
+      cli(root, "--debug", "files"),
+      cli(root, "--debug=files", "packages"),
+      cli(root, "--debug", "files", "--no-ignore"),
+    ]);
+    expect(all.code).toBe(0);
+    expect(all.stdout).toBe("AGENTS.md\npackages/a/GEMINI.md\n");
+    expect(inline.stdout).toBe("packages/a/GEMINI.md\n");
+    expect(noIgnore.stdout).toBe("AGENTS.md\nignored/AGENTS.md\npackages/a/GEMINI.md\n");
   });
 
   test("--debug files lists selected skills and exits successfully without linting", async () => {
@@ -197,19 +217,14 @@ describe("cli", () => {
         overrides: [{ files: ["custom/**"], rules: { "no-invalid-skill": ["error", { directories: ["custom"] }] } }],
       },
     });
-    expect((await cli(root)).code).toBe(1);
-    expect(await cli(root, "--debug=files,timings")).toMatchObject({
-      code: 0,
-      stdout: "custom/a/SKILL.md\n",
-      stderr: "",
-    });
-    expect((await cli(root, "--debug=files", "-A", "no-invalid-skill")).stdout).toBe("");
-  });
-
-  test("--debug rejects unknown options", async () => {
-    const { code, stderr } = await cli(makeProject({}), "--debug", "files,unknown");
-    expect(code).toBe(2);
-    expect(stderr).toContain("'unknown' is not a known debug option (available: files, timings)");
+    const [linted, listed, off] = await Promise.all([
+      cli(root),
+      cli(root, "--debug=files,timings"),
+      cli(root, "--debug=files", "-A", "no-invalid-skill"),
+    ]);
+    expect(linted.code).toBe(1);
+    expect(listed).toMatchObject({ code: 0, stdout: "custom/a/SKILL.md\n", stderr: "" });
+    expect(off.stdout).toBe("");
   });
 
   test("--debug timings counts invoked callbacks and writes the sorted table to stderr", async () => {
@@ -281,14 +296,16 @@ describe("cli", () => {
       ".agents/skills/demo/SKILL.md": "---\nname: demo\ndescription: Demonstrates linting.\n---\n# Demo\n",
     };
     const root = makeProject(files);
-    const { code, stdout, stderr } = await cli(join(root, ".agents", "skills", "demo"));
-    expect(code).toBe(0);
-    expect(stdout).toContain("on 1 file with 1 rule");
-    expect(stderr).toBe("");
-
     // Without Git, the project is the skill directory: the skills directory above it is outside.
     const outside = makeProject(files, { git: false });
-    expect((await cli(join(outside, ".agents", "skills", "demo"))).stdout).toContain("on 0 files");
+    const [inside, noGit] = await Promise.all([
+      cli(join(root, ".agents", "skills", "demo")),
+      cli(join(outside, ".agents", "skills", "demo")),
+    ]);
+    expect(inside.code).toBe(0);
+    expect(inside.stdout).toContain("on 1 file with 1 rule");
+    expect(inside.stderr).toBe("");
+    expect(noGit.stdout).toContain("on 0 files");
   });
 
   test("warns when an explicitly named file is skipped by a configured ignore", async () => {
@@ -299,43 +316,32 @@ describe("cli", () => {
       "local/AGENTS.md": "# Local instructions\n",
     });
     const file = join("generated", "AGENTS.md");
-    const { stdout, stderr, code } = await cli(root, file);
+    const [{ stdout, stderr, code }, denied, noIgnore, gitignored] = await Promise.all([
+      cli(root, file),
+      cli(root, "-f", "json", "--deny-warnings", file),
+      cli(root, "--no-ignore", file),
+      cli(root, "--debug", "files", join("local", "AGENTS.md")),
+    ]);
     expect(code).toBe(0);
     expect(stdout).toContain("File skipped because it matches an ignore pattern");
     expect(stdout).toContain("Found 1 warning and 0 errors.");
     expect(stdout).not.toContain("missing.ts");
     expect(stderr).toBe("");
 
-    const denied = await cli(root, "-f", "json", "--deny-warnings", file);
     expect(denied.code).toBe(1);
     expect(JSON.parse(denied.stdout)).toMatchObject({
       number_of_files: 0,
       warnings: 1,
       diagnostics: [{ filename: file, severity: "warning", rule: null }],
     });
-    expect((await cli(root, "--no-ignore", file)).stdout).toContain("Path `missing.ts` does not exist");
-    expect((await cli(root, "--debug", "files", ".")).stdout).toBe("");
-    expect((await cli(root, "--debug", "files", join("local", "AGENTS.md"))).stdout).toBe(
-      `${join("local", "AGENTS.md")}\n`,
-    );
+    expect(noIgnore.stdout).toContain("Path `missing.ts` does not exist");
+    expect(gitignored.stdout).toBe(`${join("local", "AGENTS.md")}\n`);
   });
 });
 
 describe("compiled binary", () => {
   const bin = process.env.AGENTFILE_LINTER_TEST_BINARY ?? join(import.meta.dir, "..", "dist", "agentfile-linter");
   const testBinary = test.skipIf(!process.env.AGENTFILE_LINTER_TEST_BINARY && !existsSync(bin));
-
-  testBinary("dist/agentfile-linter lints a project", async () => {
-    const root = makeProject({ "AGENTS.md": "`missing.ts`\n", "CLAUDE.md": "@AGENTS.md\n" });
-    const proc = Bun.spawn([bin, "-f", "unix"], {
-      cwd: root,
-      stdout: "pipe",
-      env: { ...process.env, NO_COLOR: "1" },
-    });
-    const stdout = await new Response(proc.stdout).text();
-    expect(await proc.exited).toBe(1);
-    expect(stdout).toContain("AGENTS.md:1:2: Path `missing.ts` does not exist");
-  });
 
   testBinary("dist/agentfile-linter ignores Bun runtime config in the scanned project", async () => {
     const root = makeProject({

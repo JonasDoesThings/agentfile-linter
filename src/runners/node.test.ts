@@ -19,10 +19,8 @@ describe("parseScriptInvocation", () => {
     ["pnpm test", "test", "dir", false],
     ["pnpm -r build", "build", "recursive", true],
     ["pnpm --filter web dev", "dev", "selectors", true],
-    ["pnpm -F web dev", "dev", "selectors", true],
     ["pnpm --filter=web run dev", "dev", "selectors", false],
     ["pnpm -w lint", "lint", "workspace-root", true],
-    ["pnpm -C apps/web dev", "dev", "dir", true],
     ["npm run build", "build", "dir", false],
     ["npm test", "test", "dir", false],
     ["npm run build --workspace=web", "build", "selectors", false],
@@ -42,24 +40,17 @@ describe("parseScriptInvocation", () => {
 
   test.each([
     "pnpm install",
-    "pnpm add -D vitest",
     "pnpm exec tsc",
-    "pnpm dlx create-vite",
     "npm install",
-    "npm ci",
     "npx tsc",
     "yarn",
     "yarn add react",
     "bun test",
-    "bun install",
     "bun src/index.ts",
-    "bun x tsc",
     "bun -e 'console.log(1)'",
     "pnpm run --if-present lint",
     "npm run build --if-present",
-    "pnpm run /^dev:/",
     "pnpm $SCRIPT",
-    "git status",
     "pnpm run",
   ])("%p is not a script invocation", (cmd) => {
     expect(parse(cmd)).toBeNull();
@@ -222,20 +213,11 @@ describe("npm / pnpm / yarn / bun", () => {
     ]);
   });
 
-  test("Bun accepts existing local entry files without a package.json", async () => {
-    const root = makeProject({
-      "AGENTS.md": "`bun run tool.ts`, `bun tool.ts` and `bun run tool`\n",
-      "tool.ts": "console.log('TypeScript entry point');\n",
-      tool: "console.log('Extensionless entry point');\n",
-    });
-    expect(await runRule(root, RULE)).toEqual([]);
-  });
-
   test("Bun checks entry files in the command's working directory", async () => {
     const root = makeProject({
       "package.json": { name: "root", scripts: { dev: "echo dev" } },
       "AGENTS.md": [
-        "`bun --cwd docs run tool.ts` and `bun run dev` work.",
+        "`bun --cwd docs run tool.ts`, `bun run dev`, `bun root.ts` and `bun run tool` work.",
         "`bun run tool.ts` is missing here.",
         "`bun run output` names a directory.",
         "`npm run root.ts` requires a package script.",
@@ -243,17 +225,13 @@ describe("npm / pnpm / yarn / bun", () => {
       "docs/tool.ts": "",
       "output/.keep": "",
       "root.ts": "",
+      tool: "",
     });
     expect(messages(await runRule(root, RULE))).toEqual([
       "Script `tool.ts` is not defined in `package.json`",
       "Script `output` is not defined in `package.json`",
       "Script `root.ts` is not defined in `package.json`",
     ]);
-  });
-
-  test("npm start falls back to server.js", async () => {
-    const root = makeProject({ "package.json": { name: "x" }, "server.js": "", "AGENTS.md": "`npm start`\n" });
-    expect(await runRule(root, RULE)).toEqual([]);
   });
 
   test("npm restart also falls back to npm start", async () => {

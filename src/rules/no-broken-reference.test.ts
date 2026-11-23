@@ -13,6 +13,7 @@ describe("agentfile/no-broken-reference", () => {
         "[ok](docs/guide.md) [ok2](./docs/) ![logo](img/logo.png)",
         "[missing](docs/missing.md) ![gone](img/gone.png)",
         "[ref][r]",
+        "[a](https://x.dev/a.md) [b](mailto:a@b.c) [c](//cdn.x/y.js) [d](vscode://file/x)",
         "",
         "[r]: ./docs/nope.md",
         "",
@@ -25,13 +26,6 @@ describe("agentfile/no-broken-reference", () => {
       "Link target `./docs/nope.md` does not exist",
     ]);
     expect(diagnostics[0]).toMatchObject({ line: 2, column: 11 });
-  });
-
-  test("ignores external links, mailto and protocol-relative URLs", async () => {
-    const root = makeProject({
-      "AGENTS.md": "[a](https://x.dev/a.md) [b](mailto:a@b.c) [c](//cdn.x/y.js) [d](vscode://file/x)\n",
-    });
-    expect(await runRule(root, RULE)).toEqual([]);
   });
 
   test("checks local anchors with GitHub slugs", async () => {
@@ -157,26 +151,22 @@ describe("agentfile/no-broken-reference", () => {
     expect(messages(await runRule(root, RULE))).toEqual(["Link target `/docs/other.md` does not exist"]);
   });
 
-  test("checks href/src in inline HTML", async () => {
-    const root = makeProject({
-      "AGENTS.md": '<img src="logo.png" width="20">\n\n<a href="docs/x.md">x</a>\n',
-    });
-    expect(messages(await runRule(root, RULE))).toEqual([
-      "Link target `logo.png` does not exist",
-      "Link target `docs/x.md` does not exist",
-    ]);
-  });
-
-  test("decodes escaped filename characters and checks commented-out links", async () => {
+  test("decodes escaped filename characters; checks href/src in inline HTML, also when commented out", async () => {
     const root = makeProject({
       "docs/Usage #1 & notes.md": "# Install\n",
       "AGENTS.md": [
         "[Guide](docs/Usage%20%231%20%26%20notes.md#install)",
         '<!-- <a href="docs/Usage%20%231%20%26%20notes.md">Notes</a> -->',
         '<!-- <img src="docs/missing%23figure.png"> -->',
+        '<img src="logo.png" width="20">',
+        '<a href="docs/x.md">x</a>',
       ].join("\n\n"),
     });
-    expect(messages(await runRule(root, RULE))).toEqual(["Link target `docs/missing%23figure.png` does not exist"]);
+    expect(messages(await runRule(root, RULE))).toEqual([
+      "Link target `docs/missing%23figure.png` does not exist",
+      "Link target `logo.png` does not exist",
+      "Link target `docs/x.md` does not exist",
+    ]);
   });
 
   test("skips git-ignored targets and honors options", async () => {

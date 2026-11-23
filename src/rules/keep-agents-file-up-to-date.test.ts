@@ -47,12 +47,10 @@ describe("agentfile/keep-agents-file-up-to-date", () => {
   });
 
   test("is off by default and reports warnings when enabled", async () => {
-    const root = makeProject({ "AGENTS.md": CONTENT });
+    const root = makeProject({ "AGENTS.md": CONTENT, ...withOptions({}) });
     commit(root, { daysAgo: 365 });
-    expect(await run(root)).toEqual([]);
-    const enabled = makeProject({ "AGENTS.md": CONTENT, ...withOptions({}) });
-    commit(enabled, { daysAgo: 365 });
-    expect((await run(enabled)).map((d) => [d.rule, d.severity])).toEqual([[RULE, "warn"]]);
+    expect(await run(root, { config: false })).toEqual([]);
+    expect((await run(root)).map((d) => [d.rule, d.severity])).toEqual([[RULE, "warn"]]);
   });
 
   test("a merge counts as an update of the files it brings in", async () => {
@@ -75,12 +73,16 @@ describe("agentfile/keep-agents-file-up-to-date", () => {
   });
 
   test.each([30, "30"])("warnIfNotUpdatedForDays: %p", async (days) => {
-    const root = makeProject({ "AGENTS.md": CONTENT, ...withOptions({ warnIfNotUpdatedForDays: days }) });
-    commit(root, { daysAgo: 31 });
-    expect(messages(await run(root))).toEqual([expect.stringContaining("31 days")]);
-    const fresh = makeProject({ "AGENTS.md": CONTENT, ...withOptions({ warnIfNotUpdatedForDays: days }) });
-    commit(fresh, { daysAgo: 30 });
-    expect(await run(fresh)).toEqual([]);
+    const root = makeProject({
+      "AGENTS.md": CONTENT,
+      "packages/a/AGENTS.md": CONTENT,
+      ...withOptions({ warnIfNotUpdatedForDays: days }),
+    });
+    commit(root, { daysAgo: 31, paths: ["AGENTS.md"] });
+    commit(root, { daysAgo: 30, paths: ["packages/a/AGENTS.md"] });
+    expect((await run(root)).map((d) => [d.file, d.message])).toEqual([
+      ["AGENTS.md", expect.stringContaining("31 days")],
+    ]);
   });
 
   test("warnOnlyForFilesLongerThanChars skips short files", async () => {
@@ -148,26 +150,21 @@ describe("agentfile/keep-agents-file-up-to-date", () => {
   });
 
   test("files with uncommitted changes are skipped", async () => {
-    const root = makeProject({ "AGENTS.md": CONTENT });
+    const files = ["AGENTS.md", "unstaged/AGENTS.md", "staged/AGENTS.md", "deleted-from-index/AGENTS.md"];
+    const root = makeProject(Object.fromEntries(files.map((file) => [file, CONTENT])));
     commit(root, { daysAgo: 200 });
-    appendFileSync(join(root, "AGENTS.md"), "More.\n");
-    expect(await runRule(root, RULE)).toEqual([]);
-    runGit(root, ["add", "AGENTS.md"]);
-    expect(await runRule(root, RULE)).toEqual([]);
+    appendFileSync(join(root, "unstaged/AGENTS.md"), "More.\n");
+    appendFileSync(join(root, "staged/AGENTS.md"), "More.\n");
+    runGit(root, ["add", "staged/AGENTS.md"]);
+    // The old file is still in the working tree, so the mtime fallback must not report it either.
+    modifiedDaysAgo(root, "deleted-from-index/AGENTS.md", 200);
+    runGit(root, ["rm", "--cached", "deleted-from-index/AGENTS.md"]);
+    expect((await runRule(root, RULE)).map((d) => d.file)).toEqual(["AGENTS.md"]);
   });
 
-  test("a mode change counts as uncommitted unless core.fileMode is false", async () => {
-    // A key without a value is true in Git.
+  test("a mode change counts as uncommitted when core.fileMode is a key without a value", async () => {
+    // A key without a value is true in Git. `false` is covered by the next-run test below.
     expect(await withFileMode("\tfilemode")).toEqual([]);
-    expect(await withFileMode("\tfilemode = false")).toEqual([expect.stringContaining("has not been updated")]);
-  });
-
-  test("a staged deletion is skipped if the old file is still in the working tree", async () => {
-    const root = makeProject({ "AGENTS.md": CONTENT });
-    commit(root, { daysAgo: 200 });
-    modifiedDaysAgo(root, "AGENTS.md", 200);
-    runGit(root, ["rm", "--cached", "AGENTS.md"]);
-    expect(await runRule(root, RULE)).toEqual([]);
   });
 
   test("staged additions are skipped even without a first commit", async () => {

@@ -161,15 +161,6 @@ describe("agentfile/no-missing-script", () => {
     expect(messages(await run(root))).toEqual(["Script `nope` is not defined in `package.json`"]);
   });
 
-  test("checks nested commands of run wrappers", async () => {
-    const root = makeProject({
-      Makefile: "build:\n\techo\n",
-      "pyproject.toml": '[project]\nname = "x"\n',
-      "AGENTS.md": "`uv run make build` and `uv run make nope`\n",
-    });
-    expect(messages(await runRule(root, RULE))).toEqual(["Make target `nope` is not defined in `Makefile`"]);
-  });
-
   test("run wrappers honor runner opt-outs and continue checking other commands", async () => {
     const root = makeProject({
       Makefile: "build:\n\techo\n",

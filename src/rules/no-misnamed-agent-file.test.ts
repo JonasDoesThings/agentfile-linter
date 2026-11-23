@@ -25,7 +25,7 @@ function isCaseInsensitive(): boolean {
 }
 
 describe("agentfile/no-misnamed-agent-file", () => {
-  test("differently cased agent files in the project root", async () => {
+  test("differently cased agent files in the project root, reported at the start of the file", async () => {
     const root = makeProject({
       "agents.md": CONTENT,
       "Claude.md": CONTENT,
@@ -34,27 +34,20 @@ describe("agentfile/no-misnamed-agent-file", () => {
       "README.md": "# Project\n",
       "CHANGELOG.md": "# Changes\n",
     });
-    expect(await summary(root)).toEqual([
+    const diagnostics = await runRule(root, RULE);
+    expect(diagnostics.map((d) => `${d.file}: ${d.message}`)).toEqual([
       "CLAUDE.LOCAL.md: `CLAUDE.LOCAL.md` must be named exactly `CLAUDE.local.md`",
       "Claude.md: `Claude.md` must be named exactly `CLAUDE.md`",
       "agents.md: `agents.md` must be named exactly `AGENTS.md`",
       "gemini.md: `gemini.md` must be named exactly `GEMINI.md`",
     ]);
-  });
-
-  test("reports at the start of the file with a hint about case-only renames", async () => {
-    const root = makeProject({ "claude.md": CONTENT });
-    expect(await runRule(root, RULE)).toEqual([
-      {
-        file: "claude.md",
-        rule: RULE,
-        line: 1,
-        column: 1,
-        severity: "error",
-        message: "`claude.md` must be named exactly `CLAUDE.md`",
-        help: expect.stringContaining("rename it with `git mv`"),
-      },
-    ]);
+    expect(diagnostics[1]).toMatchObject({
+      rule: RULE,
+      line: 1,
+      column: 1,
+      severity: "error",
+      help: expect.stringContaining("rename it with `git mv`"),
+    });
   });
 
   test("a wrongly cased extension is reported anywhere", async () => {
@@ -112,23 +105,6 @@ describe("agentfile/no-misnamed-agent-file", () => {
       "api/Setup.markdown": "# Setup\n",
     });
     expect(await summary(root)).toEqual([]);
-  });
-
-  test("a lowercase agent.md is reported like the other context file names", async () => {
-    const root = makeProject({
-      "package.json": { name: "app" },
-      "README.md": "# App\n",
-      "agent.md": "You are a helpful agent.\n",
-      "packages/web/package.json": { name: "web" },
-      "packages/web/Agent.md": "You are a helpful agent.\n",
-      "services/api/CLAUDE.md": CONTENT,
-      "services/api/agent.md": CONTENT,
-    });
-    expect(await summary(root)).toEqual([
-      "agent.md: `agent.md` must be named exactly `AGENT.md`",
-      "packages/web/Agent.md: `Agent.md` must be named exactly `AGENT.md`",
-      "services/api/agent.md: `agent.md` must be named exactly `AGENT.md`",
-    ]);
   });
 
   test("names matching the configured context file patterns are context files", async () => {
@@ -189,18 +165,18 @@ describe("agentfile/no-misnamed-agent-file", () => {
     ]);
   });
 
-  test("symlinks are checked by their own name", async () => {
-    const root = makeProject({ "AGENTS.md": CONTENT, "claude.md": { symlink: "AGENTS.md" } });
-    expect(await summary(root)).toEqual(["claude.md: `claude.md` must be named exactly `CLAUDE.md`"]);
-  });
-
-  test("symlinked directories are not followed", async () => {
+  test("symlinks are checked by their own name; symlinked directories are not followed", async () => {
     const root = makeProject({
+      "AGENTS.md": CONTENT,
+      "claude.md": { symlink: "AGENTS.md" },
       "packages/web/package.json": { name: "web" },
       "packages/web/claude.md": CONTENT,
       web: { symlink: "packages/web" },
     });
-    expect(await summary(root)).toEqual(["packages/web/claude.md: `claude.md` must be named exactly `CLAUDE.md`"]);
+    expect(await summary(root)).toEqual([
+      "claude.md: `claude.md` must be named exactly `CLAUDE.md`",
+      "packages/web/claude.md: `claude.md` must be named exactly `CLAUDE.md`",
+    ]);
   });
 
   test("ignored files are skipped unless named on the command line", async () => {

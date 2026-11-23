@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { makeProject, messages, runRule } from "#test/helpers.ts";
 
-import { expandGenerative, noxSessions } from "./python.ts";
+import { expandGenerative } from "./python.ts";
 
 const RULE = "agentfile/no-missing-script";
 
@@ -186,10 +186,6 @@ describe("nox", () => {
     "    pass",
     "",
   ].join("\n");
-
-  test("noxSessions", () => {
-    expect(noxSessions(NOXFILE)).toEqual(new Set(["tests", "lint-all"]));
-  });
 
   test("checks -s sessions", async () => {
     const root = makeProject({

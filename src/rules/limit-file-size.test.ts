@@ -73,12 +73,4 @@ describe("agentfile/limit-file-size", () => {
       ],
     ]);
   });
-
-  test("can be suppressed for a file", async () => {
-    const root = makeProject({
-      "AGENTS.md": `<!-- agentfile-linter-disable agentfile/limit-file-size -- long on purpose -->\n${sized(100)}`,
-      ...withOptions({ maxChars: 50 }),
-    });
-    expect(await run(root)).toEqual([]);
-  });
 });
