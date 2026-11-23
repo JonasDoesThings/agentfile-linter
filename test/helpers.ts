@@ -1,4 +1,3 @@
-import { afterAll } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -10,9 +9,14 @@ import type { Diagnostic } from "#src/types.ts";
 export type FileSpec = string | { symlink: string } | Record<string, unknown>;
 
 const created: string[] = [];
-afterAll(() => {
-  for (const dir of created) rmSync(dir, { recursive: true, force: true });
-});
+
+/**
+ * Deletes every project `makeProject()` created. `test/setup.ts` calls it once per run: an
+ * `afterAll` here would only run after the first test file that imports this module.
+ */
+export function removeTempProjects() {
+  for (const dir of created.splice(0)) rmSync(dir, { recursive: true, force: true });
+}
 
 /**
  * Creates a temporary project. String values are written verbatim, objects as
