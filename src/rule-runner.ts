@@ -4,6 +4,7 @@ import type { Nodes } from "mdast";
 
 import type { EnabledRule } from "./config.ts";
 import type { Project } from "./project.ts";
+import type { RuleTimings } from "./rule-timings.ts";
 import type { SourceCode } from "./source-code.ts";
 import type { AnyRule, Diagnostic, Position, ReportDescriptor, RuleContext, Visitor } from "./types.ts";
 import { assertNever } from "./util.ts";
@@ -138,7 +139,11 @@ interface RuleRun {
  * Runs the `create` and `createOnce` hooks of `rules` over one file. One walk of the AST calls the
  * visitors of all rules. A rule that throws is reported as crashed and stops checking the file.
  */
-export async function runRules(rules: readonly EnabledRule[], file: FileInput): Promise<Diagnostic[]> {
+export async function runRules(
+  rules: readonly EnabledRule[],
+  file: FileInput,
+  timings?: RuleTimings,
+): Promise<Diagnostic[]> {
   const diagnostics: Diagnostic[] = [];
   type Listener = { run: RuleRun; query?: esquery.Selector; listener: (node: Nodes) => unknown };
   /** Listeners on entering and leaving nodes, by node type (`*` for any). */
@@ -153,7 +158,7 @@ export async function runRules(rules: readonly EnabledRule[], file: FileInput): 
   const guard = <T>(run: RuleRun, fn: (arg: T) => unknown, arg: T) => {
     if (run.crashed) return;
     try {
-      const result = fn(arg);
+      const result = timings ? timings.measure(run.enabled.id, () => fn(arg)) : fn(arg);
       if (result instanceof Promise) run.pending.push(result.catch((error: unknown) => crash(run, error)));
     } catch (error) {
       crash(run, error);
@@ -180,22 +185,20 @@ export async function runRules(rules: readonly EnabledRule[], file: FileInput): 
       diagnostics.push(toDiagnostic(enabled, file.filename, descriptor));
     };
     const context = Object.freeze(Object.assign(Object.create(fileContext) as RuleContext, { id, options, report }));
-    guard(
-      run,
-      () => {
-        const created = createVisitor(rule, context);
-        if (!created) return;
-        for (const [key, listener] of Object.entries(created.visitor)) {
-          if (typeof listener !== "function") continue;
-          const { exit, types, query } = parseSelector(key);
-          const byType = exit ? listeners.exit : listeners.enter;
-          const entry = { run, query, listener: listener as Listener["listener"] };
-          for (const type of types) byType.set(type, [...(byType.get(type) ?? []), entry]);
-        }
-        run.after = created.after;
-      },
-      undefined,
-    );
+    try {
+      const created = createVisitor(rule, context, timings);
+      if (!created) continue;
+      for (const [key, listener] of Object.entries(created.visitor)) {
+        if (typeof listener !== "function") continue;
+        const { exit, types, query } = parseSelector(key);
+        const byType = exit ? listeners.exit : listeners.enter;
+        const entry = { run, query, listener: listener as Listener["listener"] };
+        for (const type of types) byType.set(type, [...(byType.get(type) ?? []), entry]);
+      }
+      run.after = created.after;
+    } catch (error) {
+      crash(run, error);
+    }
   }
 
   /** The ancestors of the current node, the parent first (as esquery expects). */
@@ -234,13 +237,21 @@ export async function runRules(rules: readonly EnabledRule[], file: FileInput): 
 
 /**
  * The rule's visitor for one file, and the `after` hook of `createOnce`, or undefined when the
- * `before` hook skips the file. Hooks are called without `this`, as in Oxlint.
+ * `before` hook skips the file.
  */
 function createVisitor(
   rule: AnyRule,
   context: RuleContext,
+  timings?: RuleTimings,
 ): { visitor: Visitor; after?: () => void | Promise<void> } | undefined {
-  if (rule.create) return { visitor: rule.create(context) };
-  const { before, after, ...visitor } = (rule.createOnce as NonNullable<AnyRule["createOnce"]>)(context);
-  return before?.() === false ? undefined : { visitor, after };
+  const { id } = context;
+  if (rule.create) {
+    return { visitor: timings ? timings.measure(id, rule.create.bind(rule, context)) : rule.create(context) };
+  }
+  const createOnce = rule.createOnce as NonNullable<AnyRule["createOnce"]>;
+  const { before, after, ...visitor } = timings
+    ? timings.measure(id, createOnce.bind(rule, context))
+    : createOnce.call(rule, context);
+  if (before && (timings ? timings.measure(id, before) : before()) === false) return undefined;
+  return { visitor, after };
 }

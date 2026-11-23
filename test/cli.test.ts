@@ -198,14 +198,75 @@ describe("cli", () => {
       },
     });
     expect((await cli(root)).code).toBe(1);
-    expect(await cli(root, "--debug=files")).toMatchObject({ code: 0, stdout: "custom/a/SKILL.md\n", stderr: "" });
+    expect(await cli(root, "--debug=files,timings")).toMatchObject({
+      code: 0,
+      stdout: "custom/a/SKILL.md\n",
+      stderr: "",
+    });
     expect((await cli(root, "--debug=files", "-A", "no-invalid-skill")).stdout).toBe("");
   });
 
   test("--debug rejects unknown options", async () => {
-    const { code, stderr } = await cli(makeProject({}), "--debug", "files,timings");
+    const { code, stderr } = await cli(makeProject({}), "--debug", "files,unknown");
     expect(code).toBe(2);
-    expect(stderr).toContain("'timings' is not a known debug option (available: files)");
+    expect(stderr).toContain("'unknown' is not a known debug option (available: files, timings)");
+  });
+
+  test("--debug timings counts invoked callbacks and writes the sorted table to stderr", async () => {
+    const root = makeProject({
+      "AGENTS.md": "# Heading\n\n`missing.ts`\n",
+      "CLAUDE.md": "# Skipped heading\n",
+      "timed.mjs": `export default { meta: { name: "timed" }, rules: {
+        file: {
+          createOnce(context) {
+            return {
+              before() { return !context.filename.endsWith("CLAUDE.md"); },
+              heading() {},
+              "heading:exit"() {},
+              "heading[depth=2]"() {},
+              async after() { await Bun.sleep(25); },
+            };
+          },
+        },
+        tree: {
+          collectTreeInputs() { return []; },
+          async checkTree() { await Bun.sleep(25); },
+        },
+        crash: {
+          create() { return { heading() { throw new Error("timed crash"); } }; },
+        },
+      } };`,
+      ".agentfile-linterrc.json": {
+        categories: { recommended: "off" },
+        jsPlugins: ["./timed.mjs"],
+        rules: { "no-missing-path": "error", "timed/file": "error", "timed/tree": "error", "timed/crash": "error" },
+      },
+    });
+    const { code, stdout, stderr } = await cli(root, "--debug", "timings", "--format=json");
+    expect(code).toBe(1);
+    expect(JSON.parse(stdout)).toMatchObject({ diagnostics: expect.any(Array) });
+    expect(stdout).toContain("timed crash");
+    expect(stderr).toMatch(/^Rule timings:\nRule +Time \(ms\) +Relative +Calls +Source\n/);
+    const rows = stderr
+      .trimEnd()
+      .split("\n")
+      .slice(3)
+      .map((line) => {
+        const [rule, time, , calls, source] = line.split(/\s+/);
+        return { rule, time: Number(time), calls: Number(calls), source };
+      });
+    expect(rows.map((row) => row.time)).toEqual(rows.map((row) => row.time).toSorted((a, b) => b - a));
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        { rule: "timed/file", time: expect.any(Number), calls: 7, source: "plugin" },
+        { rule: "timed/tree", time: expect.any(Number), calls: 2, source: "plugin" },
+        { rule: "timed/crash", time: expect.any(Number), calls: 4, source: "plugin" },
+        { rule: "agentfile/no-missing-path", time: expect.any(Number), calls: expect.any(Number), source: "built-in" },
+      ]),
+    );
+    for (const rule of ["timed/file", "timed/tree"]) {
+      expect(rows.find((row) => row.rule === rule)?.time).toBeGreaterThan(10);
+    }
   });
 
   test("prints a hint when no context files are found", async () => {

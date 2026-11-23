@@ -16,14 +16,14 @@ export interface CliArgs {
   format: Format;
   silent: boolean;
   printConfig: boolean;
-  /** `--debug` options (currently only `files`). */
+  /** `--debug` options. */
   debug: DebugOption[];
   listRules: boolean;
   help: boolean;
   version: boolean;
 }
 
-export const DEBUG_OPTIONS = ["files"] as const;
+export const DEBUG_OPTIONS = ["files", "timings"] as const;
 export type DebugOption = (typeof DEBUG_OPTIONS)[number];
 
 export class UsageError extends Error {
@@ -191,6 +191,7 @@ Miscellaneous
       --print-config      Print the effective configuration and exit
       --debug=OPTIONS     Enable debug output. Options are comma-separated:
                             * files - print the list of files that will be linted, then exit
+                            * timings - print per-rule timings and call counts to stderr
       --rules             List all registered rules and exit
   -h, --help              Print help
   -V, --version           Print version

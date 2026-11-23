@@ -44,6 +44,7 @@ agentfile-linter -f github               # GitHub Actions annotations
 agentfile-linter --rules                 # list rules
 agentfile-linter --init                  # create .agentfile-linterrc.json
 agentfile-linter --debug files           # print the files that would be linted, then exit
+agentfile-linter --debug timings         # lint and print per-rule timings, slowest first
 ```
 
 With no config file and no rule flags, every rule marked as recommended in the table below runs as an `error`.
@@ -93,10 +94,12 @@ Besides context files, [`agentfile/no-invalid-skill`](#agentfileno-invalid-skill
 | `-f, --format <fmt>`     | `default`, `stylish`, `json`, `github` or `unix`                                                         |
 | `--silent`               | Print no diagnostics                                                                                     |
 | `--print-config`         | Print the effective configuration                                                                        |
-| `--debug=<options>`      | Debug output, comma-separated. `files`: print the files that would be linted, then exit                  |
+| `--debug=<options>`      | Debug output, comma-separated. Use `files` to list inputs or `timings` to profile rule calls             |
 | `--rules`                | List all rules, including those of `jsPlugins`. Config problems are printed below the list               |
 
 `-A`/`-W`/`-D` are applied left to right, after the config file. A rule name can be written with or without its `agentfile/` prefix.
+
+`--debug timings` prints a table to stderr, sorted by total elapsed time per rule. **Calls** counts each invocation of a rule's `create` or `createOnce` hook, `before` and `after` hooks, matching Markdown visitors, and `collectTreeInputs` and `checkTree` hooks. **Relative** is each rule's share of the sum of all measured times. Async callbacks include time spent waiting for completion and can overlap. Use `--silent --debug timings` to print the table alone. If `files` is also requested, the CLI exits after listing files.
 
 **Exit codes:** `0` means no errors. `1` means lint errors were found, or warnings exceeded `--deny-warnings` / `--max-warnings`. `2` means invalid usage or configuration.
 

@@ -10,6 +10,7 @@ import { shouldUseColor } from "./colors.ts";
 import { CONFIG_FILE_NAMES, ConfigError } from "./config.ts";
 import { format } from "./formatters.ts";
 import { availableRules, collectFiles, lint, setup } from "./linter.ts";
+import { RuleTimings } from "./rule-timings.ts";
 
 const INIT_CONFIG = `{
   // Severity for every rule in a category: "off" | "warn" | "error"
@@ -110,7 +111,8 @@ export async function main(argv: string[]): Promise<number> {
       return 0;
     }
 
-    const result = await lint(options, prepared);
+    const ruleTimings = args.debug.includes("timings") ? new RuleTimings() : undefined;
+    const result = await lint({ ...options, ruleTimings }, prepared);
     const warningCount = result.warningCount;
     if (args.quiet) {
       for (const file of result.files) file.diagnostics = file.diagnostics.filter((d) => d.severity === "error");
@@ -122,6 +124,7 @@ export async function main(argv: string[]): Promise<number> {
         err(`No context files found (looking for: ${prepared.config.files.join(", ")}).\n`);
       }
     }
+    if (ruleTimings) err(ruleTimings.format());
 
     if (result.errorCount > 0) return 1;
     if (args.denyWarnings && warningCount > 0) return 1;

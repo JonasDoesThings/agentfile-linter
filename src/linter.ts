@@ -20,6 +20,7 @@ import { PatternIgnore } from "./gitignore.ts";
 import { parseMarkdown } from "./markdown.ts";
 import { ALWAYS_SKIPPED_DIRS, type Project, ProjectRegistry, tryRealpath } from "./project.ts";
 import { crashDiagnostic, runRules, toDiagnostic } from "./rule-runner.ts";
+import type { RuleTimings } from "./rule-timings.ts";
 import { SourceCode } from "./source-code.ts";
 import {
   applySuppressions,
@@ -29,7 +30,15 @@ import {
   unknownRuleDiagnostics,
   unnecessarySuppressionDiagnostics,
 } from "./suppressions.ts";
-import type { Diagnostic, FileResult, LintResult, Position, TreeDiscoveryContext, TreeInput } from "./types.ts";
+import type {
+  Diagnostic,
+  FileResult,
+  LintResult,
+  Position,
+  TreeContext,
+  TreeDiscoveryContext,
+  TreeInput,
+} from "./types.ts";
 
 export const DEFAULT_IGNORE_FILE = ".agentfile-linterignore";
 
@@ -48,6 +57,8 @@ export interface LintOptions {
   ignorePath?: string;
   /** Disable .gitignore, ignore files and ignore patterns. */
   noIgnore?: boolean;
+  /** Collect per-rule callback timings for this run. */
+  ruleTimings?: RuleTimings;
 }
 
 export interface LintSetup {
@@ -133,6 +144,7 @@ async function lintFile(
   rules: EnabledRule[],
   { cwd, config }: LintSetup,
   directiveCache: DirectiveCache,
+  timings?: RuleTimings,
 ): Promise<Diagnostic[]> {
   let text: string;
   let realPath: string;
@@ -147,7 +159,7 @@ async function lintFile(
   const directives = collectDirectives(sourceCode, config.registry);
   directiveCache.set(realPath, directives);
   const { settings } = config;
-  const diagnostics = await runRules(rules, { filename: path, cwd, sourceCode, project, settings });
+  const diagnostics = await runRules(rules, { filename: path, cwd, sourceCode, project, settings }, timings);
   const kept = [
     ...applySuppressions(diagnostics, directives),
     ...unknownRuleDiagnostics(path, directives, config.registry),
@@ -291,13 +303,17 @@ function collectTreeInputs(
   resolver: RuleResolver,
   includeDisabled: boolean,
   cwd: string,
+  timings?: RuleTimings,
 ): { found: Map<string, TreeInput[]>; crashes: Map<string, Diagnostic> } {
   const found = new Map<string, TreeInput[]>();
   const crashes = new Map<string, Diagnostic>();
   for (const [id, rule] of resolver.registry.rules) {
     if (!rule.collectTreeInputs || !(includeDisabled || resolver.canEnable(id))) continue;
     try {
-      const ruleInputs: unknown = rule.collectTreeInputs(treeDiscoveryContext(id, inputs, registry, resolver));
+      const context = treeDiscoveryContext(id, inputs, registry, resolver);
+      const ruleInputs: unknown = timings
+        ? timings.measure(id, rule.collectTreeInputs.bind(rule, context))
+        : rule.collectTreeInputs(context);
       if (!Array.isArray(ruleInputs)) throw new TypeError("`collectTreeInputs` must return an array");
       found.set(id, ruleInputs as TreeInput[]);
     } catch (error) {
@@ -374,6 +390,7 @@ function collectInputs(options: LintOptions, prepared: LintSetup, registry: Proj
     prepared.resolver,
     hasOtherExplicitFiles,
     cwd,
+    options.ruleTimings,
   );
   const treeInputs = new Map<string, TreeInput[]>();
   for (const [id, ruleInputs] of found) {
@@ -444,6 +461,7 @@ async function lintTree(
   resolver: RuleResolver,
   cwd: string,
   directives: DirectiveCache,
+  timings?: RuleTimings,
 ) {
   // Rules whose `collectTreeInputs` crashed don't run `checkTree`: they report the crash instead.
   const diagnostics: Diagnostic[] = [...inputs.treeCrashes.values()];
@@ -482,7 +500,7 @@ async function lintTree(
         );
       };
       try {
-        await rule.checkTree?.({
+        const context: TreeContext<unknown[]> = {
           ...treeDiscoveryContext(ruleId, inputs, registry, resolver),
           cwd,
           contextFiles: inputs.contextFiles,
@@ -499,7 +517,8 @@ async function lintTree(
             const diagnostic = toDiagnostic(setting, filePath, descriptor, { line: 1, column: 1 });
             if (!isSuppressed(filePath, diagnostic.start)) diagnostics.push(diagnostic);
           },
-        });
+        };
+        await (timings ? timings.measure(ruleId, () => rule.checkTree?.(context)) : rule.checkTree?.(context));
       } catch (error) {
         diagnostics.push(crashDiagnostic(ruleId, cwd, error));
       }
@@ -571,10 +590,13 @@ export async function lint(options: LintOptions = {}, prepared?: LintSetup): Pro
         // Tree rules count once they check something (see `tree.enabledRules`).
         for (const name of checking) enabledRules.add(name);
         const project = registry.forDirectory(dirname(path));
-        return { filePath: path, diagnostics: await lintFile(path, project, rules, ready, directives) };
+        return {
+          filePath: path,
+          diagnostics: await lintFile(path, project, rules, ready, directives, options.ruleTimings),
+        };
       }),
     ),
-    lintTree(inputs, registry, resolver, ready.cwd, directives),
+    lintTree(inputs, registry, resolver, ready.cwd, directives, options.ruleTimings),
   ]);
   const realPath = (path: string) => inputs.aliases.realPath(path);
   const lintedFiles = new Set(paths.map(realPath));
